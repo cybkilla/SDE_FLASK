@@ -19,7 +19,7 @@
   <h4 class="fw-bold mb-0">{{ res.company_name }}</h4>
   <span class="text-muted">·</span>
   <span class="fw-semibold" style="color:{{ th.main }}">{{ ticker }}</span>
-  {% if market.sector %}
+  {% if market.sector and market.sector not in ['N/A', 'n/a', ''] %}
   <span class="badge rounded-pill"
         style="background:#f3f4f6;color:#6b7280;font-weight:500;font-size:.72rem">
     {{ market.sector }}
@@ -40,7 +40,7 @@
 </div>
 <p class="text-muted small mb-3">
   CEO : {{ res.ceo_name or '—' }}
-  {% if market.industry %} · {{ market.industry }}{% endif %}
+  {% if market.industry and market.industry not in ['N/A', 'n/a', ''] %} · {{ market.industry }}{% endif %}
 </p>
 
 <hr class="sde-divider mb-3">
@@ -49,7 +49,7 @@
 <div class="row g-2 mb-3">
 
   <!-- Prix live -->
-  {% set var  = market.var_1d %}
+  {% set var  = market.var_1d if market.var_1d is not none else 0.0 %}
   {% set cvar = '#1D9E75' if var >= 0 else '#D85A30' %}
   {% set arr  = '▲' if var >= 0 else '▼' %}
   <div class="col-12 col-md-5">
