@@ -1,0 +1,111 @@
+<div class="sde-sidebar-inner">
+
+  <!-- ── Logo + caption ─────────────────────────────────── -->
+  <div class="sde-sidebar-logo text-center px-3 pt-3 pb-2">
+    <img src="{{ url_for('static', filename='img/SDE.png') }}"
+         onerror="this.style.display='none'"
+         alt="SDE" class="img-fluid mb-2" style="max-height:80px">
+    <p class="sde-caption mb-1">
+      Agrège des signaux fondamentaux, techniques et médiatiques
+      pour produire une recommandation <strong>Acheter / Vendre / Neutre</strong>.
+    </p>
+    <p class="sde-disclaimer">
+      ⚠️ Cet outil n'est pas un conseil financier.
+    </p>
+  </div>
+
+  <div class="sde-divider mx-3"></div>
+
+  <!-- ── Recherche ──────────────────────────────────────── -->
+  <div class="px-3 pt-2 pb-1">
+    <p class="sde-section-label">
+      <i class="bi bi-search me-1"></i>Rechercher une société
+    </p>
+
+    <div class="position-relative mb-2">
+      <input type="text" id="sde-search-input"
+             class="form-control form-control-sm"
+             placeholder="ex. Apple, LVMH, Tesla…"
+             autocomplete="off">
+      <ul id="sde-search-dropdown"
+          class="list-group position-absolute w-100 shadow-sm d-none"
+          style="z-index:1050;max-height:220px;overflow-y:auto;top:100%"></ul>
+    </div>
+
+    <!-- Badge ticker sélectionné (affiché par JS après sélection) -->
+    <div id="sde-ticker-badge" class="d-none mb-2">
+      <div class="sde-ticker-selected">
+        Ticker sélectionné&nbsp;:
+        <strong id="sde-ticker-label"></strong>
+        <button id="sde-ticker-clear" class="btn-plain ms-auto"
+                title="Effacer">✕</button>
+      </div>
+    </div>
+
+    <!-- Saisie directe (visible si pas de résultat de recherche) -->
+    <div id="sde-direct-input-wrapper" class="d-none mb-2">
+      <input type="text" id="sde-direct-input"
+             class="form-control form-control-sm text-uppercase"
+             placeholder="AAPL · TSLA · MC.PA"
+             maxlength="10">
+      <div class="form-text sde-caption">
+        Aucun résultat — saisissez le ticker directement.
+      </div>
+    </div>
+
+    <button id="sde-analyze-btn"
+            class="btn btn-sde-teal btn-sm w-100"
+            disabled>
+      <i class="bi bi-graph-up-arrow me-1"></i>Analyser
+    </button>
+  </div>
+
+  <div class="sde-divider mx-3 mt-2"></div>
+
+  <!-- ── Section utilisateur ────────────────────────────── -->
+  <div class="px-3 py-2">
+    <p class="sde-section-label"><i class="bi bi-person me-1"></i>User</p>
+
+    {% if current_user.is_authenticated %}
+      <div class="sde-user-badge mb-2">
+        <i class="bi bi-person-circle me-1"></i>
+        <span>{{ current_user.name }}</span>
+      </div>
+      <a href="{{ url_for('auth.logout') }}"
+         class="btn btn-outline-secondary btn-sm w-100 py-0">
+        Déconnecter
+      </a>
+    {% else %}
+      <p class="sde-caption mb-2">
+        Connectez-vous pour activer les alertes email et sauvegarder votre watchlist.
+      </p>
+      <a href="{{ url_for('auth.login') }}"
+         class="btn btn-sde-teal btn-sm w-100 mb-1">Se connecter</a>
+      <a href="{{ url_for('auth.register') }}"
+         class="btn btn-outline-secondary btn-sm w-100 py-0">Créer un compte</a>
+    {% endif %}
+  </div>
+
+  <div class="sde-divider mx-3"></div>
+
+  <!-- ── Watchlist ───────────────────────────────────────── -->
+  <div class="px-3 py-2">
+    <p class="sde-section-label">
+      <i class="bi bi-bookmark-star me-1"></i>Ma watchlist
+    </p>
+
+    {% if current_user.is_authenticated %}
+      <div id="sde-watchlist">
+        <!-- J7 : rempli par AJAX ou Jinja2 -->
+        <p class="sde-caption">Migration watchlist — Jour 7</p>
+      </div>
+    {% else %}
+      <p class="sde-caption">
+        <a href="{{ url_for('auth.login') }}" class="sde-link">
+          Connectez-vous
+        </a> pour accéder à la watchlist.
+      </p>
+    {% endif %}
+  </div>
+
+</div>

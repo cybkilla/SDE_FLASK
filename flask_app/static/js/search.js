@@ -1,43 +1,68 @@
-// search.js — Autocomplete ticker search
-// J1  : stub (ne fait rien, évite les erreurs 404)
-// J4  : implémentation AJAX complète vers /api/search
+// search.js — Autocomplete ticker + gestion sidebar
+// J2  : badge ticker, bouton effacer, saisie directe fallback
+// J4  : AJAX /api/search (debounce déjà en place)
 
 (function () {
-  const input    = document.getElementById("sde-search-input");
-  const dropdown = document.getElementById("sde-search-dropdown");
-  const btn      = document.getElementById("sde-analyze-btn");
+  const input       = document.getElementById("sde-search-input");
+  const dropdown    = document.getElementById("sde-search-dropdown");
+  const btn         = document.getElementById("sde-analyze-btn");
+  const badge       = document.getElementById("sde-ticker-badge");
+  const badgeLabel  = document.getElementById("sde-ticker-label");
+  const clearBtn    = document.getElementById("sde-ticker-clear");
+  const directWrap  = document.getElementById("sde-direct-input-wrapper");
+  const directInput = document.getElementById("sde-direct-input");
 
-  if (!input) return; // page sans sidebar (ex: login)
+  if (!input) return;
 
   let selectedTicker = null;
   let debounceTimer  = null;
 
-  // ── Sélection d'un ticker ────────────────────────────────────────────────────
-  function selectTicker(ticker, label) {
-    selectedTicker   = ticker;
-    input.value      = label;
-    btn.disabled     = false;
-    dropdown.innerHTML = "";
-    dropdown.classList.add("d-none");
+  // ── Sélectionne un ticker (depuis dropdown) ───────────────────────────────
+  function selectTicker(ticker, name) {
+    selectedTicker = ticker.toUpperCase();
+    input.value    = name + " (" + selectedTicker + ")";
+    closeDropdown();
+    showBadge(selectedTicker);
+    btn.disabled = false;
+    if (directWrap) directWrap.classList.add("d-none");
   }
 
-  // ── Bouton Analyser ──────────────────────────────────────────────────────────
+  function showBadge(ticker) {
+    if (!badge || !badgeLabel) return;
+    badgeLabel.textContent = ticker;
+    badge.classList.remove("d-none");
+  }
+
+  function clearSelection() {
+    selectedTicker = null;
+    input.value    = "";
+    btn.disabled   = true;
+    if (badge)      badge.classList.add("d-none");
+    if (directWrap) directWrap.classList.add("d-none");
+    closeDropdown();
+    input.focus();
+  }
+
+  if (clearBtn) clearBtn.addEventListener("click", clearSelection);
+
+  // ── Bouton Analyser ───────────────────────────────────────────────────────
   btn.addEventListener("click", function () {
-    if (selectedTicker) {
-      window.location.href = "/analyze/" + encodeURIComponent(selectedTicker);
-    }
+    const ticker = selectedTicker
+      || (directInput && directInput.value.trim().toUpperCase());
+    if (ticker) window.location.href = "/analyze/" + encodeURIComponent(ticker);
   });
 
-  // ── Saisie → appel AJAX /api/search (J4) ────────────────────────────────────
+  // ── Saisie recherche → AJAX ───────────────────────────────────────────────
   input.addEventListener("input", function () {
     const q = this.value.trim();
-    btn.disabled   = true;
     selectedTicker = null;
-
+    btn.disabled   = true;
+    if (badge) badge.classList.add("d-none");
     clearTimeout(debounceTimer);
 
     if (q.length < 2) {
-      dropdown.classList.add("d-none");
+      closeDropdown();
+      if (directWrap) directWrap.classList.add("d-none");
       return;
     }
 
@@ -45,53 +70,67 @@
       fetch("/api/search?q=" + encodeURIComponent(q))
         .then(function (r) { return r.json(); })
         .then(function (data) {
-          renderDropdown(data);
+          if (!data || data.error || data.length === 0) {
+            closeDropdown();
+            // Fallback saisie directe si ça ressemble à un ticker (≤ 6 chars, sans espace)
+            if (directWrap && q.length <= 6 && !q.includes(" ")) {
+              directInput.value = q.toUpperCase();
+              directWrap.classList.remove("d-none");
+              selectedTicker = q.toUpperCase();
+              btn.disabled   = false;
+            }
+          } else {
+            if (directWrap) directWrap.classList.add("d-none");
+            renderDropdown(data);
+          }
         })
-        .catch(function () {
-          dropdown.classList.add("d-none");
-        });
-    }, 280); // debounce 280 ms
+        .catch(function () { closeDropdown(); });
+    }, 280);
   });
 
-  // ── Rendu dropdown ───────────────────────────────────────────────────────────
+  // ── Saisie directe ticker ─────────────────────────────────────────────────
+  if (directInput) {
+    directInput.addEventListener("input", function () {
+      const v    = this.value.trim().toUpperCase();
+      this.value = v;
+      selectedTicker = v || null;
+      btn.disabled   = !v;
+      if (v) showBadge(v); else if (badge) badge.classList.add("d-none");
+    });
+  }
+
+  // ── Rendu dropdown ────────────────────────────────────────────────────────
   function renderDropdown(items) {
     dropdown.innerHTML = "";
-
-    if (!items || items.length === 0) {
-      dropdown.classList.add("d-none");
-      return;
-    }
-
     items.slice(0, 8).forEach(function (item) {
-      const ticker = item.ticker || item.symbol || "";
+      const ticker = (item.ticker || item.symbol || "").toUpperCase();
       const name   = item.shortName || item.longName || ticker;
       const li     = document.createElement("li");
-      li.className = "list-group-item list-group-item-action d-flex justify-content-between";
+      li.className = "list-group-item list-group-item-action d-flex justify-content-between align-items-center";
       li.innerHTML =
-        '<span>' + escHtml(name) + '</span>' +
-        '<span class="text-muted small">' + escHtml(ticker) + '</span>';
-      li.addEventListener("click", function () {
-        selectTicker(ticker, name + " (" + ticker + ")");
-      });
+        '<span class="text-truncate me-2">' + escHtml(name) + '</span>' +
+        '<span class="text-muted small flex-shrink-0">' + escHtml(ticker) + '</span>';
+      li.addEventListener("click", function () { selectTicker(ticker, name); });
       dropdown.appendChild(li);
     });
-
     dropdown.classList.remove("d-none");
   }
 
-  // ── Fermer dropdown si clic ailleurs ────────────────────────────────────────
+  function closeDropdown() {
+    dropdown.innerHTML = "";
+    dropdown.classList.add("d-none");
+  }
+
   document.addEventListener("click", function (e) {
-    if (!input.contains(e.target) && !dropdown.contains(e.target)) {
-      dropdown.classList.add("d-none");
-    }
+    if (!input.contains(e.target) && !dropdown.contains(e.target)) closeDropdown();
   });
 
-  // ── Escape HTML ─────────────────────────────────────────────────────────────
-  function escHtml(str) {
-    return String(str)
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;");
+  input.addEventListener("keydown", function (e) {
+    if (e.key === "Escape") clearSelection();
+  });
+
+  function escHtml(s) {
+    return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
   }
 
 })();
