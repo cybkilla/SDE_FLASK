@@ -153,44 +153,102 @@
     </div>
   </div>
 
-  <!-- Jauge score (placeholder J8) + composantes -->
+  <!-- Jauge SVG + composantes (J8) -->
   <div class="col-12 col-md-8">
     <div class="card border-0 shadow-sm p-3 h-100">
-      <div class="sde-section-label mb-2">Score global — {{ "%.2f"|format(res.score_global) }}/100</div>
+      <div class="sde-section-label mb-2">Score global &amp; décomposition</div>
 
-      <!-- Barre score global -->
-      <div class="mb-3">
-        <div class="d-flex justify-content-between small text-muted mb-1">
-          <span>0</span><span>50</span><span>100</span>
-        </div>
-        <div class="progress" style="height:8px;border-radius:4px">
-          <div class="progress-bar" role="progressbar"
-               style="width:{{ res.score_global }}%;background:{{ th.main }};border-radius:4px">
+      <!-- Jauge demi-cercle + score -->
+      {% set arc_len    = (res.score_global / 100 * 314.16) | round(1) %}
+      {% set needle_deg = (res.score_global * 1.8 - 90)     | round(1) %}
+      <div class="d-flex align-items-center gap-3 mb-3">
+        <svg viewBox="0 0 240 145" style="flex:0 0 auto;width:clamp(120px,45%,180px);display:block">
+          <defs>
+            <linearGradient id="sde-gv" x1="20" y1="0" x2="220" y2="0"
+                            gradientUnits="userSpaceOnUse">
+              <stop offset="0%"   stop-color="#F5C4B3"/>
+              <stop offset="50%"  stop-color="#9FE1CB"/>
+              <stop offset="100%" stop-color="#1D9E75"/>
+            </linearGradient>
+            <mask id="sde-gm">
+              <rect x="0" y="0" width="240" height="145" fill="black"/>
+              <path d="M 20 125 A 100 100 0 0 1 220 125"
+                    fill="none" stroke="white" stroke-width="20"
+                    stroke-linecap="round"
+                    stroke-dasharray="{{ arc_len }} 314.16"/>
+            </mask>
+          </defs>
+          <!-- Arc fond -->
+          <path d="M 20 125 A 100 100 0 0 1 220 125"
+                fill="none" stroke="#f0f0f0" stroke-width="20"
+                stroke-linecap="round"/>
+          <!-- Arc dégradé coral→teal -->
+          <rect x="0" y="0" width="240" height="145"
+                fill="url(#sde-gv)" mask="url(#sde-gm)"/>
+          <!-- Aiguille -->
+          <line x1="120" y1="125" x2="120" y2="32"
+                stroke="#9ca3af" stroke-width="1.5" stroke-dasharray="3 3"
+                stroke-linecap="round"
+                style="transform-origin:120px 125px;transform:rotate({{ needle_deg }}deg)"/>
+          <!-- Pivot -->
+          <circle cx="120" cy="125" r="5" fill="#374151"/>
+          <circle cx="120" cy="125" r="2.5" fill="white"/>
+          <!-- Labels -->
+          <text x="14"  y="140" font-size="9" fill="#9ca3af" text-anchor="middle" font-family="Arial">0</text>
+          <text x="120" y="18"  font-size="9" fill="#9ca3af" text-anchor="middle" font-family="Arial">50</text>
+          <text x="226" y="140" font-size="9" fill="#9ca3af" text-anchor="middle" font-family="Arial">100</text>
+        </svg>
+
+        <!-- Score + badge reco -->
+        <div>
+          <div style="font-size:.65rem;color:#9ca3af;text-transform:uppercase;
+                      letter-spacing:.5px;margin-bottom:2px">Score global</div>
+          <div style="font-size:2.8rem;font-weight:500;line-height:1;
+                      color:{{ th.main }}">{{ "%.2f"|format(res.score_global) }}</div>
+          <div style="font-size:.7rem;color:#9ca3af;margin-bottom:8px">/ 100</div>
+          <div style="display:inline-block;font-size:.75rem;font-weight:500;
+                      padding:4px 14px;border-radius:6px;
+                      background:{{ th.bg }};color:{{ th.txt }};border:1px solid {{ th.bd }}">
+            {{ th.icon }} {{ res.recommandation }}
           </div>
         </div>
       </div>
 
-      <!-- 3 composantes -->
+      <!-- 3 composantes enrichies -->
       <div class="row g-2">
         {% set comp_themes = [
-          ('Technique',   res.score_tech,  '#0C447C','#E6F1FB','#85B7EB','40%'),
-          ('Fondamental', res.score_fund,  '#27500A','#EAF3DE','#97C459','35%'),
-          ('Médiatique',  res.score_media, '#633806','#FAEEDA','#EF9F27','25%'),
+          ('Technique',   res.score_tech,  '40%',
+           '#0C447C','#E6F1FB','#85B7EB','#185FA5',
+           'RSI · MA · MACD · Volume',
+           'Mesure la dynamique du cours : indique si le titre est en tendance haussière ou baissière à court terme.'),
+          ('Fondamentaux', res.score_fund, '35%',
+           '#27500A','#EAF3DE','#97C459','#3B6D11',
+           'P/E · EPS · Dette · Croiss. CA',
+           'Évalue la santé financière de la société : reflète la solidité économique réelle de l\'entreprise.'),
+          ('Médiatique',  res.score_media, '25%',
+           '#633806','#FAEEDA','#EF9F27','#854F0B',
+           'Sentiment · Insider · Alertes CEO',
+           'Analyse la presse et les dirigeants : capte les signaux humains et médiatiques autour du titre.'),
         ] %}
-        {% for label, score, ctxt, cbg, cbd, poids in comp_themes %}
-        <div class="col-4">
+        {% for label, score, poids, ctxt, cbg, cbd, cbar, indicators, explanation in comp_themes %}
+        <div class="col-12 col-sm-4">
           <div style="background:{{ cbg }};border:0.5px solid {{ cbd }};
                       border-radius:8px;padding:10px 12px">
             <div class="d-flex justify-content-between align-items-baseline mb-1">
               <span style="font-size:.75rem;font-weight:500;color:{{ ctxt }}">{{ label }}</span>
-              <span style="font-size:.65rem;color:{{ ctxt }};border:0.5px solid {{ cbd }};
-                           border-radius:3px;padding:0 5px">{{ poids }}</span>
+              <span style="font-size:.6rem;color:{{ ctxt }};border:0.5px solid {{ cbd }};
+                           border-radius:3px;padding:0 4px">{{ poids }}</span>
             </div>
-            <div style="font-size:1.5rem;font-weight:500;color:{{ ctxt }};line-height:1">
-              {{ "%.1f"|format(score) }}
+            <div style="font-size:1.5rem;font-weight:500;color:{{ cbar }};line-height:1;margin-bottom:5px">
+              {{ "%.2f"|format(score) }}
             </div>
-            <div style="height:3px;background:#e5e7eb;border-radius:2px;margin-top:6px">
-              <div style="height:3px;width:{{ score }}%;background:{{ ctxt }};border-radius:2px"></div>
+            <div style="height:4px;background:#e5e7eb;border-radius:2px;overflow:hidden;margin-bottom:7px">
+              <div style="height:4px;width:{{ score }}%;background:{{ cbar }};border-radius:2px"></div>
+            </div>
+            <div style="font-size:.65rem;color:#6b7280;margin-bottom:4px">{{ indicators }}</div>
+            <div style="height:.5px;background:#e5e7eb;margin-bottom:4px"></div>
+            <div style="font-size:.6rem;color:#6b7280;line-height:1.4;font-style:italic">
+              {{ explanation }}
             </div>
           </div>
         </div>
