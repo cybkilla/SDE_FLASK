@@ -1,5 +1,5 @@
 # flask_app/blueprints/auth.py
-# Auth Flask-Login — stockage MongoDB (si MONGO_URI défini) ou YAML local (dev)
+# Auth Flask-Login — stockage Supabase (si SUPABASE_URL défini) ou YAML local (dev)
 
 import re
 from flask import Blueprint, render_template, redirect, url_for, request, flash

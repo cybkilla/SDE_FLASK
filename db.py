@@ -1,42 +1,55 @@
-# db.py — MongoDB Atlas Data API (HTTPS port 443)
-# Évite les problèmes TLS sur port 27017 dans certains environnements Docker.
+# db.py — Supabase (PostgreSQL via REST HTTPS, port 443)
 # Fallback automatique vers fichiers locaux si variables absentes.
 
-import os, requests
+import os
 
-_BASE = "https://data.mongodb-api.com/app/{app_id}/endpoint/data/v1/action"
-_DB   = "sde"
-_ready = False
+_ready   = False
 _enabled = False
-_app_id  = ""
-_api_key  = ""
+_client  = None
 
 
 def _init():
-    global _ready, _enabled, _app_id, _api_key
+    global _ready, _enabled, _client
     if _ready:
         return
-    _ready   = True
-    _app_id  = os.getenv("ATLAS_APP_ID",  "").strip()
-    _api_key = os.getenv("ATLAS_API_KEY", "").strip()
-    if _app_id and _api_key:
-        _enabled = True
-        print("[DB] Atlas Data API configurée ✓")
+    _ready = True
+    url = os.getenv("SUPABASE_URL", "").strip()
+    key = os.getenv("SUPABASE_KEY", "").strip()
+    if url and key:
+        try:
+            from supabase import create_client
+            _client  = create_client(url, key)
+            _enabled = True
+            print("[DB] Connecté à Supabase ✓")
+        except Exception as e:
+            print(f"[DB] Échec connexion Supabase : {e}")
     else:
-        print("[DB] ATLAS_APP_ID / ATLAS_API_KEY absents — mode fichiers locaux")
-
-
-def _url(action: str) -> str:
-    return _BASE.format(app_id=_app_id) + "/" + action
-
-
-def _headers() -> dict:
-    return {"Content-Type": "application/json", "api-key": _api_key}
+        print("[DB] SUPABASE_URL / SUPABASE_KEY absents — mode fichiers locaux")
 
 
 def is_available() -> bool:
     _init()
     return _enabled
+
+
+def _apply_filter(query, filter: dict):
+    for k, v in filter.items():
+        query = query.eq(k, v)
+    return query
+
+
+def _project(docs: list, projection: dict | None) -> list:
+    if not projection or not docs:
+        return docs
+    excludes = {k for k, v in projection.items() if v == 0}
+    includes = {k for k, v in projection.items() if v == 1}
+    result = []
+    for doc in docs:
+        if includes:
+            result.append({k: v for k, v in doc.items() if k in includes})
+        else:
+            result.append({k: v for k, v in doc.items() if k not in excludes})
+    return result
 
 
 # ── Opérations génériques ─────────────────────────────────────────────────────
@@ -45,59 +58,58 @@ def find_one(collection: str, filter: dict, projection: dict = None) -> dict | N
     _init()
     if not _enabled:
         return None
-    body = {"dataSource": "sde-cluster", "database": _DB,
-            "collection": collection, "filter": filter}
-    if projection:
-        body["projection"] = projection
-    r = requests.post(_url("findOne"), json=body, headers=_headers(), timeout=8)
-    r.raise_for_status()
-    return r.json().get("document")
+    q = _client.table(collection).select("*")
+    q = _apply_filter(q, filter)
+    r = q.limit(1).execute()
+    docs = _project(r.data, projection)
+    return docs[0] if docs else None
 
 
 def find(collection: str, filter: dict, projection: dict = None) -> list:
     _init()
     if not _enabled:
         return []
-    body = {"dataSource": "sde-cluster", "database": _DB,
-            "collection": collection, "filter": filter}
-    if projection:
-        body["projection"] = projection
-    r = requests.post(_url("find"), json=body, headers=_headers(), timeout=8)
-    r.raise_for_status()
-    return r.json().get("documents", [])
+    q = _client.table(collection).select("*")
+    q = _apply_filter(q, filter)
+    r = q.execute()
+    return _project(r.data, projection)
 
 
 def insert_one(collection: str, document: dict):
     _init()
     if not _enabled:
         return
-    body = {"dataSource": "sde-cluster", "database": _DB,
-            "collection": collection, "document": document}
-    r = requests.post(_url("insertOne"), json=body, headers=_headers(), timeout=8)
-    r.raise_for_status()
+    _client.table(collection).insert(document).execute()
 
 
 def update_one(collection: str, filter: dict, update: dict, upsert: bool = False):
     _init()
     if not _enabled:
         return
-    body = {"dataSource": "sde-cluster", "database": _DB,
-            "collection": collection, "filter": filter,
-            "update": update, "upsert": upsert}
-    r = requests.post(_url("updateOne"), json=body, headers=_headers(), timeout=8)
-    r.raise_for_status()
+    # Gère la syntaxe MongoDB {"$set": {...}}
+    fields = update.get("$set", update)
+    if upsert:
+        _client.table(collection).upsert({**filter, **fields}).execute()
+    else:
+        q = _client.table(collection).update(fields)
+        q = _apply_filter(q, filter)
+        q.execute()
 
 
 def delete_one(collection: str, filter: dict):
     _init()
     if not _enabled:
         return
-    body = {"dataSource": "sde-cluster", "database": _DB,
-            "collection": collection, "filter": filter}
-    r = requests.post(_url("deleteOne"), json=body, headers=_headers(), timeout=8)
-    r.raise_for_status()
+    q = _client.table(collection).delete()
+    q = _apply_filter(q, filter)
+    q.execute()
 
 
 def count_documents(collection: str, filter: dict) -> int:
-    docs = find(collection, filter)
-    return len(docs)
+    _init()
+    if not _enabled:
+        return 0
+    q = _client.table(collection).select("*", count="exact")
+    q = _apply_filter(q, filter)
+    r = q.execute()
+    return r.count or 0

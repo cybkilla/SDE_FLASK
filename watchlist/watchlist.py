@@ -1,5 +1,5 @@
 # watchlist/watchlist.py
-# Stockage MongoDB (si MONGO_URI défini) ou JSON local (dev sans MongoDB)
+# Stockage Supabase (si SUPABASE_URL défini) ou JSON local (dev sans Supabase)
 
 import json
 import pandas as pd

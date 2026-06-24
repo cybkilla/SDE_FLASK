@@ -1,10 +1,8 @@
 # SDE Flask — dépendances
 # pip install -r requirements.txt
 
-# ── Base de données NoSQL ─────────────────────────────────
-pymongo>=4.6.0        # driver MongoDB
-dnspython>=2.6.0      # requis pour les URI mongodb+srv://
-certifi>=2024.0.0     # certificats CA embarqués (fix SSL Docker)
+# ── Base de données (Supabase / PostgreSQL via REST HTTPS) ─
+supabase>=2.0.0
 
 # ── Données boursières ────────────────────────────────────
 yfinance>=1.0.0
