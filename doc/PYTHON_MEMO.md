@@ -721,6 +721,42 @@ ts["Close"] = pd.to_numeric(ts["Close"])
 
 ---
 
+## Resend — Envoi d'emails (HTTP)
+
+Plan gratuit : 3 000 emails/mois, 100/jour.  
+Avantage vs SMTP : passe par HTTPS (port 443) — jamais bloqué par les hébergeurs cloud (Render, Railway…).
+
+```python
+import os
+import resend
+
+# Lire la clé depuis l'environnement (jamais en dur)
+resend.api_key = os.getenv("RESEND_API_KEY", "")
+
+# Envoi simple
+result = resend.Emails.send({
+    "from":    "SDE <onboarding@resend.dev>",   # adresse test sans domaine propre
+    "to":      ["destinataire@example.com"],      # liste d'adresses
+    "subject": "Alerte AAPL",
+    "html":    "<p>Cours AAPL en hausse de <b>+6.3%</b></p>",
+})
+# result["id"] → identifiant unique de l'email envoyé
+
+# Avec domaine vérifié (resend.com → Domains → Add Domain)
+resend.Emails.send({
+    "from": "SDE <noreply@mondomaine.com>",
+    ...
+})
+```
+
+**Sans domaine propre** : utiliser `onboarding@resend.dev` comme expéditeur.  
+Les emails partent bien mais peuvent atterrir en spam.
+
+**Avec domaine** : vérifier le domaine dans le dashboard Resend (ajout d'enregistrements DNS),
+puis utiliser `noreply@mondomaine.com` — meilleure délivrabilité.
+
+---
+
 ## Supabase — Base de données
 
 ```python

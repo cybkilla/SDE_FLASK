@@ -17,7 +17,7 @@ Application web d'aide à la décision boursière. Analyse n'importe quelle acti
 - **Figures chartistes** : détection de patterns avec explication contextuelle
 - **Watchlist** personnelle (AJAX, sans rechargement de page)
 - **Authentification** : inscription / connexion / sessions persistantes (Flask-Login + bcrypt)
-- **Alertes email** : notification sur variation de cours (SMTP Gmail)
+- **Alertes email** : notification sur variation de cours ou changement de recommandation (Resend HTTP)
 - **Interface responsive** : navbar intégrée, mobile-first, pas de sidebar
 
 ## Stack technique
@@ -32,9 +32,11 @@ Application web d'aide à la décision boursière. Analyse n'importe quelle acti
 | LLM | Groq API (LLaMA 3.3 70B) + Ollama (fallback local) |
 | Graphiques | matplotlib (PNG base64), Plotly (JSON → JS) |
 | Actualités | NewsAPI, feedparser (RSS) |
+| Email | Resend (HTTP API — fonctionne sur Render, remplace SMTP) |
+| Scheduler | cron-job.org → `/scheduler/run` toutes les 30 min |
 | Serveur prod | gunicorn |
 | Conteneur | Docker + docker-compose |
-| Déploiement cloud | Render (Docker) |
+| Déploiement cloud | Render — `https://sde-flask.onrender.com` |
 
 ## Installation
 
@@ -70,7 +72,11 @@ TWELVE_DATA_API_KEY=votre_cle_twelvedata
 # Supabase (laisser vide → fallback YAML/JSON local)
 SUPABASE_URL=https://xxxxx.supabase.co
 SUPABASE_KEY=eyJhbGci...            # clé anon (publique)
-SMTP_PASSWORD=app_password_gmail    # optionnel, pour les alertes email
+# Alertes email via Resend (HTTP — fonctionne sur Render)
+RESEND_API_KEY=re_xxxxxxxxxxxx
+RESEND_FROM=SDE StockDecisionEngine <onboarding@resend.dev>
+# Scheduler cron-job.org
+CRON_SECRET=un_token_aleatoire_long
 ```
 
 - **NewsAPI** : clé gratuite sur [newsapi.org](https://newsapi.org)
@@ -78,7 +84,8 @@ SMTP_PASSWORD=app_password_gmail    # optionnel, pour les alertes email
 - **Finnhub** : clé gratuite sur [finnhub.io](https://finnhub.io) — quote temps réel + fondamentaux (60 req/min)
 - **Twelve Data** : clé gratuite sur [twelvedata.com](https://twelvedata.com) — historique OHLCV NASDAQ/NYSE (800 req/jour)
 - **Supabase** : projet gratuit sur [supabase.com](https://supabase.com) — voir `doc/SUPABASE.md`
-- **SMTP** : mot de passe d'application Gmail (Compte → Sécurité → Mots de passe d'applications)
+- **Resend** : compte gratuit sur [resend.com](https://resend.com) — 3 000 emails/mois, API HTTP (non bloqué par Render)
+- **CRON_SECRET** : token aléatoire (`python -c "import secrets; print(secrets.token_hex(24))"`) — protège `/scheduler/run`
 
 ### 3. Lancer en développement
 
@@ -101,6 +108,27 @@ docker-compose up --build
 ```
 
 Le conteneur expose le port `5000`. Les données utilisateurs (watchlist, auth) sont persistées dans Supabase (variables `SUPABASE_URL` et `SUPABASE_KEY` requises en production).
+
+## Scheduler & Alertes
+
+Le scheduler vérifie toutes les watchlists toutes les 30 minutes via [cron-job.org](https://cron-job.org).
+
+| Endpoint | Rôle |
+|---|---|
+| `POST /scheduler/run` | Déclenche le scheduler complet (thread background, répond 202) |
+| `GET /scheduler/test-email?to=...` | Envoie un email de test Resend sans pipeline |
+
+Les deux endpoints sont protégés par le header `X-Cron-Secret` ou le paramètre `?secret=CRON_SECRET`.
+
+**Configuration cron-job.org** :
+- URL : `https://sde-flask.onrender.com/scheduler/run`
+- Méthode : GET
+- Header : `X-Cron-Secret: votre_CRON_SECRET`
+- Intervalle : toutes les 30 minutes
+
+Une alerte est envoyée si :
+- La recommandation change (ex : NEUTRE → ACHETER)
+- La variation du cours dépasse 5% depuis la dernière vérification
 
 ## Structure du projet
 
