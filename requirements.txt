@@ -6,6 +6,7 @@ supabase>=2.0.0
 
 # ── Données boursières ────────────────────────────────────
 finnhub-python>=2.4.0
+twelvedata[pandas]>=1.2.0
 yfinance>=1.0.0
 pandas==2.2.2
 numpy==1.26.4

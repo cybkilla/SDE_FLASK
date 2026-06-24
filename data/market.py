@@ -1,15 +1,14 @@
-# data/market.py — données marché via Finnhub (fonctionne sur cloud)
+# data/market.py — OHLCV via Twelve Data + quote/fondamentaux via Finnhub
 import re
-import time
 import pandas as pd
 from utils.indicators import add_indicators
-from config import HISTORY_DAYS, FINNHUB_API_KEY
+from config import HISTORY_DAYS, FINNHUB_API_KEY, TWELVE_DATA_API_KEY
 
-# ── Client Finnhub (singleton) ────────────────────────────
+# ── Finnhub client (singleton) ────────────────────────────
 _fh_client = None
 
 
-def _client():
+def _fh():
     global _fh_client
     if _fh_client is None:
         if not FINNHUB_API_KEY:
@@ -39,64 +38,70 @@ def _period_to_days(period: str) -> int:
     return n * {"d": 1, "w": 7, "mo": 30, "m": 30, "y": 365}.get(unit, 1)
 
 
-def _ticker_candidates(ticker: str) -> list:
-    """Variantes Finnhub à essayer pour un ticker au format yfinance (ex. MC.PA → MC)."""
-    candidates = [ticker.upper()]
-    if "." in ticker:
-        candidates.append(ticker.upper().split(".")[0])
-    return candidates
+# ── Twelve Data : OHLCV historique (NASDAQ / NYSE) ───────
+def _get_candles(ticker: str, days: int) -> pd.DataFrame:
+    """Récupère l'historique OHLCV depuis Twelve Data (marchés US)."""
+    if not TWELVE_DATA_API_KEY:
+        raise RuntimeError(
+            "TWELVE_DATA_API_KEY absent — ajoutez-la dans .env et sur Render"
+        )
+    from twelvedata import TDClient
+    td = TDClient(apikey=TWELVE_DATA_API_KEY)
 
+    params = {"symbol": ticker, "interval": "1day", "outputsize": min(days, 5000), "order": "ASC"}
 
-# ── Fetchers Finnhub ──────────────────────────────────────
-def _get_candles(fh, symbol: str, days: int) -> pd.DataFrame:
-    to_ts   = int(time.time())
-    from_ts = to_ts - days * 86_400
     try:
-        data = fh.stock_candles(symbol, "D", from_ts, to_ts)
-    except Exception:
+        ts = td.time_series(**params).as_pandas()
+    except Exception as e:
+        print(f"[Market] Twelve Data erreur ({ticker}): {e}")
         return pd.DataFrame()
-    if data.get("s") != "ok" or not data.get("c"):
+
+    if ts is None or ts.empty:
         return pd.DataFrame()
-    df = pd.DataFrame(
-        {
-            "Open":   data["o"],
-            "High":   data["h"],
-            "Low":    data["l"],
-            "Close":  data["c"],
-            "Volume": data["v"],
-        },
-        index=pd.to_datetime(data["t"], unit="s", utc=True).tz_convert(None),
-    )
-    df.index.name = "Date"
-    df.index = df.index.normalize()
-    return df.sort_index()
+
+    ts.index = pd.to_datetime(ts.index)
+    ts.index.name = "Date"
+    ts = ts.rename(columns={
+        "open": "Open", "high": "High",
+        "low":  "Low",  "close": "Close", "volume": "Volume",
+    })
+    for col in ["Open", "High", "Low", "Close", "Volume"]:
+        if col in ts.columns:
+            ts[col] = pd.to_numeric(ts[col], errors="coerce")
+
+    cols = [c for c in ["Open", "High", "Low", "Close", "Volume"] if c in ts.columns]
+    return ts[cols].dropna(subset=["Close"]).sort_index()
 
 
-def _get_quote(fh, symbol: str) -> dict:
+# ── Finnhub : quote temps réel ────────────────────────────
+def _get_quote(symbol: str) -> dict:
     try:
-        return fh.quote(symbol) or {}
+        return _fh().quote(symbol) or {}
     except Exception:
         return {}
 
 
-def _get_profile(fh, symbol: str) -> dict:
+# ── Finnhub : profil entreprise ───────────────────────────
+def _get_profile(symbol: str) -> dict:
     try:
-        return fh.company_profile2(symbol=symbol) or {}
+        return _fh().company_profile2(symbol=symbol) or {}
     except Exception:
         return {}
 
 
-def _get_metrics(fh, symbol: str) -> dict:
+# ── Finnhub : fondamentaux ────────────────────────────────
+def _get_metrics(symbol: str) -> dict:
     try:
-        data = fh.company_basic_financials(symbol, "all") or {}
+        data = _fh().company_basic_financials(symbol, "all") or {}
         return data.get("metric", {})
     except Exception:
         return {}
 
 
-def _get_executives(fh, symbol: str) -> tuple:
+# ── Finnhub : dirigeants ──────────────────────────────────
+def _get_executives(symbol: str) -> tuple:
     try:
-        data    = fh.company_executives(symbol) or {}
+        data    = _fh().company_executives(symbol) or {}
         persons = data.get("executive", []) or []
 
         def _find(role: str) -> str:
@@ -114,33 +119,28 @@ def _get_executives(fh, symbol: str) -> tuple:
 # ── Fonction principale ───────────────────────────────────
 def get_market_data(ticker: str) -> dict:
     """
-    Collecte les données marché via Finnhub.
-    Interface identique à l'ancienne version yfinance :
-    retourne un dict avec 'history' DataFrame + scalaires.
+    Collecte les données marché :
+      - Historique OHLCV : Twelve Data  (fonctionne sur cloud, plan gratuit)
+      - Quote temps réel : Finnhub quote (60 req/min, plan gratuit)
+      - Profil + fondamentaux : Finnhub  (plan gratuit)
+    Interface retour identique à l'ancienne version yfinance.
     """
     ticker = ticker.upper().strip()
-    fh     = _client()
 
-    # ── 1. Historique des cours ──────────────────────────
+    # ── 1. Historique OHLCV (Twelve Data) ───────────────
     days = _period_to_days(HISTORY_DAYS)
-    hist = pd.DataFrame()
-    fh_symbol = ticker
+    hist = _get_candles(ticker, days)
 
-    for symbol in _ticker_candidates(ticker):
-        for d in (days, 30, 5):
-            hist = _get_candles(fh, symbol, d)
-            if not hist.empty:
-                fh_symbol = symbol
-                break
-        if not hist.empty:
-            break
+    # Fallback sur 30 j si l'historique complet est vide
+    if hist.empty and days > 30:
+        hist = _get_candles(ticker, 30)
 
     if hist.empty:
         raise ValueError(
-            f"Ticker '{ticker}' introuvable sur Finnhub — vérifiez le symbole."
+            f"Ticker '{ticker}' introuvable ou sans données — vérifiez le symbole."
         )
 
-    # ── 2. Indicateurs techniques ────────────────────────
+    # ── 2. Indicateurs techniques (Pandas) ──────────────
     hist        = hist.rename_axis("Date").pipe(add_indicators)
     hist_closed = hist.dropna(subset=["Close"])
     if hist_closed.empty:
@@ -164,8 +164,9 @@ def get_market_data(ticker: str) -> dict:
         except Exception:
             return default
 
-    # ── 3. Prix temps réel ───────────────────────────────
-    quote      = _get_quote(fh, fh_symbol)
+    # ── 3. Quote temps réel (Finnhub) ───────────────────
+    fh_sym = ticker
+    quote      = _get_quote(fh_sym)
     live_price = _safe(quote.get("c")) or round(float(last["Close"]), 2)
     prev_close = _safe(quote.get("pc"))
 
@@ -176,11 +177,11 @@ def get_market_data(ticker: str) -> dict:
 
     live_price = round(float(live_price), 2)
 
-    # ── 4. Profil entreprise ─────────────────────────────
-    profile = _get_profile(fh, fh_symbol)
+    # ── 4. Profil entreprise (Finnhub) ──────────────────
+    profile = _get_profile(fh_sym)
 
-    # ── 5. Fondamentaux ──────────────────────────────────
-    metrics = _get_metrics(fh, fh_symbol)
+    # ── 5. Fondamentaux (Finnhub) ────────────────────────
+    metrics = _get_metrics(fh_sym)
 
     pe = _safe(
         metrics.get("peBasicExclExtraTTM")
@@ -200,11 +201,14 @@ def get_market_data(ticker: str) -> dict:
         metrics.get("dividendYieldIndicatedAnnual")
         or metrics.get("dividendYield5Y")
     )
-    mktcap_m   = metrics.get("marketCapitalization") or profile.get("marketCapitalization")
+    mktcap_m   = (
+        metrics.get("marketCapitalization")
+        or profile.get("marketCapitalization")
+    )
     market_cap = _safe(mktcap_m and mktcap_m * 1_000_000)
 
-    # ── 6. Dirigeants ────────────────────────────────────
-    ceo_name, cfo_name = _get_executives(fh, fh_symbol)
+    # ── 6. Dirigeants (Finnhub) ──────────────────────────
+    ceo_name, cfo_name = _get_executives(fh_sym)
 
     return {
         # Identification
@@ -246,6 +250,6 @@ def get_market_data(ticker: str) -> dict:
         "cfo_name":       cfo_name,
         "officers":       [],
 
-        # DataFrame complet (graphiques)
+        # DataFrame complet (graphiques + scoring)
         "history":        hist,
     }

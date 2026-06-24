@@ -9,8 +9,9 @@ except ImportError:
 
 # ── Clés API ──────────────────────────────────────────
 # Définir ces variables dans un fichier .env (voir .env.example)
-NEWS_API_KEY    = os.getenv("NEWS_API_KEY",    "")
-FINNHUB_API_KEY = os.getenv("FINNHUB_API_KEY", "")
+NEWS_API_KEY        = os.getenv("NEWS_API_KEY",        "")
+FINNHUB_API_KEY     = os.getenv("FINNHUB_API_KEY",     "")
+TWELVE_DATA_API_KEY = os.getenv("TWELVE_DATA_API_KEY", "")
 
 # ── Paramètres d'analyse ──────────────────────────────
 RSI_PERIOD       = 14
