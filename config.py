@@ -12,6 +12,7 @@ except ImportError:
 NEWS_API_KEY        = os.getenv("NEWS_API_KEY",        "")
 FINNHUB_API_KEY     = os.getenv("FINNHUB_API_KEY",     "")
 TWELVE_DATA_API_KEY = os.getenv("TWELVE_DATA_API_KEY", "")
+CRON_SECRET         = os.getenv("CRON_SECRET",         "")
 
 # ── Paramètres d'analyse ──────────────────────────────
 RSI_PERIOD       = 14

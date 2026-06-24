@@ -23,11 +23,20 @@ USERS_FILE = Path(__file__).parent.parent / "auth" / "users.yaml"
 
 
 def get_all_users() -> dict:
-    """Retourne {username: email} depuis users.yaml."""
+    """Retourne {username: email} depuis Supabase, ou users.yaml en fallback."""
+    try:
+        from db import find, is_available
+        if is_available():
+            rows = find("users", {})
+            if rows:
+                return {r["username"]: r.get("email", "") for r in rows}
+    except Exception:
+        pass
+    # Fallback YAML (dev local sans Supabase)
     with open(USERS_FILE) as f:
         config = yaml.safe_load(f)
-    users = config["credentials"]["usernames"]
-    return {u: d["email"] for u, d in users.items()}
+    users = config.get("credentials", {}).get("usernames", {})
+    return {u: d.get("email", "") for u, d in users.items()}
 
 
 def check_all():

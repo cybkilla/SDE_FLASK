@@ -37,9 +37,11 @@ def create_app() -> Flask:
 
     from flask_app.blueprints.auth  import bp as auth_bp
     from flask_app.blueprints.stock import bp as stock_bp
+    from flask_app.blueprints.cron  import bp as cron_bp
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(stock_bp)
+    app.register_blueprint(cron_bp)
 
     # Handlers d'erreurs personnalisés
     from flask import render_template as _rt
