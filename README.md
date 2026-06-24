@@ -26,6 +26,7 @@ Application web d'aide à la décision boursière. Analyse n'importe quelle acti
 |---|---|
 | Framework web | Flask 3 + Blueprints |
 | Auth | Flask-Login, Flask-WTF (CSRF), bcrypt, YAML |
+| Base de données | Supabase (PostgreSQL) via REST HTTPS — fallback YAML/JSON local |
 | Données marché | yfinance |
 | NLP / Sentiment | VADER (défaut), FinBERT (optionnel GPU) |
 | LLM | Groq API (LLaMA 3.3 70B) + Ollama (fallback local) |
@@ -33,6 +34,7 @@ Application web d'aide à la décision boursière. Analyse n'importe quelle acti
 | Actualités | NewsAPI, feedparser (RSS) |
 | Serveur prod | gunicorn |
 | Conteneur | Docker + docker-compose |
+| Déploiement cloud | Render (Docker) |
 
 ## Installation
 
@@ -62,11 +64,15 @@ Variables requises dans `.env` :
 FLASK_SECRET_KEY=une_cle_aleatoire_longue
 NEWS_API_KEY=votre_cle_newsapi
 GROQ_API_KEY=votre_cle_groq
-SMTP_PASSWORD=app_password_gmail   # optionnel, pour les alertes email
+# Supabase (laisser vide → fallback YAML/JSON local)
+SUPABASE_URL=https://xxxxx.supabase.co
+SUPABASE_KEY=eyJhbGci...            # clé anon (publique)
+SMTP_PASSWORD=app_password_gmail    # optionnel, pour les alertes email
 ```
 
 - **NewsAPI** : clé gratuite sur [newsapi.org](https://newsapi.org)
 - **Groq** : clé gratuite sur [console.groq.com](https://console.groq.com)
+- **Supabase** : projet gratuit sur [supabase.com](https://supabase.com) — voir `doc/SUPABASE.md`
 - **SMTP** : mot de passe d'application Gmail (Compte → Sécurité → Mots de passe d'applications)
 
 ### 3. Lancer en développement
@@ -89,7 +95,7 @@ gunicorn --config gunicorn.conf.py "run_flask:app"
 docker-compose up --build
 ```
 
-Le conteneur expose le port `5000`. Les données utilisateurs (watchlist, auth) sont persistées via volumes.
+Le conteneur expose le port `5000`. Les données utilisateurs (watchlist, auth) sont persistées dans Supabase (variables `SUPABASE_URL` et `SUPABASE_KEY` requises en production).
 
 ## Structure du projet
 
@@ -98,6 +104,8 @@ sde_flask/
 ├── run_flask.py              # Point d'entrée Flask
 ├── config.py                 # Paramètres centralisés (charge .env)
 ├── pipeline.py               # Orchestrateur de l'analyse complète
+├── db.py                     # Couche persistance Supabase (fallback YAML/JSON)
+├── migrate_to_supabase.py    # Script one-shot : importe users/watchlist/scores dans Supabase
 ├── flask_app/
 │   ├── __init__.py           # Factory create_app()
 │   ├── blueprints/
