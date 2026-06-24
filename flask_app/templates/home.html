@@ -2,55 +2,156 @@
 {% block title %}SDE — Stock Decision Engine{% endblock %}
 
 {% block content %}
-<div class="sde-home">
 
-  <!-- Logo centré -->
-  <div class="text-center mb-3">
-    <img src="{{ url_for('static', filename='img/SDE.png') }}"
-         onerror="this.style.display='none'"
-         alt="SDE" style="max-height:140px;max-width:60%">
+<!-- ══ HERO ══════════════════════════════════════════════════════════════════ -->
+<div class="sde-home-hero">
+
+  <h1>Décidez mieux,<br>investissez avec confiance.</h1>
+  <p>Analyses techniques, fondamentales et médiatiques en quelques secondes.<br>
+     Score global, zones de trading et synthèse IA pour chaque action.</p>
+
+  <!-- Grande barre de recherche hero -->
+  <div class="sde-home-search">
+    <i class="bi bi-search sde-search-icon"></i>
+    <input id="sde-hero-input" type="text"
+           placeholder="Apple, LVMH, Tesla, Airbus…"
+           autocomplete="off" spellcheck="false">
+    <ul id="sde-hero-drop" class="sde-search-dropdown d-none"></ul>
   </div>
 
-  <!-- Description — même texte que Streamlit -->
-  <div class="sde-home-desc">
-    <p>
-      Analysez n'importe quelle action en quelques secondes.
-      Recherchez une société par son nom dans le panneau de gauche,
-      sélectionnez le bon titre dans la liste de suggestions,
-      puis cliquez sur <strong>Analyser</strong>.
-    </p>
-  </div>
-
-  <!-- Chips features -->
+  <!-- Chips — exemples rapides -->
   <div class="sde-home-chips">
-    <div class="sde-chip sde-chip-blue">📊 Signaux techniques</div>
-    <div class="sde-chip sde-chip-green">🏦 Données fondamentales</div>
-    <div class="sde-chip sde-chip-amber">📰 Analyse médiatique</div>
-  </div>
-
-  <!-- Exemples de recherches -->
-  <div class="sde-home-examples">
-    <div class="sde-examples-label">Exemples de recherches</div>
-    <div class="sde-examples-list">
-      {% for ex in ["Apple", "LVMH", "Tesla", "Airbus", "NVIDIA", "TotalEnergies"] %}
-      <button class="sde-example-chip" onclick="fillSearch('{{ ex }}')">
-        {{ ex }}
-      </button>
-      {% endfor %}
-    </div>
+    {% for ex in ["Apple", "LVMH", "Tesla", "Airbus", "NVIDIA", "TotalEnergies", "Amazon"] %}
+    <button class="sde-example-chip" onclick="heroFill('{{ ex }}')">{{ ex }}</button>
+    {% endfor %}
   </div>
 
 </div>
+
+<!-- ══ FEATURES ══════════════════════════════════════════════════════════════ -->
+<div class="sde-home-features">
+  <div class="sde-feature-card">
+    <div class="sde-feature-icon">📊</div>
+    <div class="sde-feature-title">Signaux techniques</div>
+    <div class="sde-feature-desc">RSI · MACD · Moyennes mobiles · Volume</div>
+  </div>
+  <div class="sde-feature-card">
+    <div class="sde-feature-icon">🏦</div>
+    <div class="sde-feature-title">Fondamentaux</div>
+    <div class="sde-feature-desc">P/E · EPS · Dette · Croissance CA</div>
+  </div>
+  <div class="sde-feature-card">
+    <div class="sde-feature-icon">📰</div>
+    <div class="sde-feature-title">Analyse médiatique</div>
+    <div class="sde-feature-desc">Sentiment presse · Alertes dirigeants</div>
+  </div>
+  <div class="sde-feature-card">
+    <div class="sde-feature-icon">🤖</div>
+    <div class="sde-feature-title">Synthèse IA</div>
+    <div class="sde-feature-desc">Résumé LLaMA 3.3 70B via Groq</div>
+  </div>
+</div>
+
+<!-- ══ DIFFÉRENCIATION ════════════════════════════════════════════════════════ -->
+<div style="max-width:780px;margin:48px auto 0">
+
+  <div style="text-align:center;margin-bottom:28px">
+    <div style="font-size:.68rem;font-weight:600;text-transform:uppercase;letter-spacing:.8px;
+                color:var(--sde-teal);margin-bottom:8px">Pourquoi SDE ?</div>
+    <h2 style="font-size:1.35rem;font-weight:700;color:var(--sde-navy);margin:0 0 8px">
+      Ce que les autres outils ne font pas
+    </h2>
+    <p style="font-size:.88rem;color:var(--sde-muted);max-width:520px;margin:0 auto">
+      Bloomberg, TradingView et Yahoo Finance vous donnent des données brutes.
+      SDE les interprète — et surveille ce que les chiffres ne voient pas.
+    </p>
+  </div>
+
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px">
+
+    <div class="sde-diff-card">
+      <div class="sde-diff-icon" style="background:#FEF3C7;color:#92400E">👔</div>
+      <div class="sde-diff-title">Risque dirigeant personnel</div>
+      <div class="sde-diff-body">
+        Divorce, scandale, mise en examen, départ précipité, vente massive d'actions&nbsp;: SDE surveille
+        les événements <em>hors bilan</em> qui peuvent faire chuter un titre avant que la presse financière
+        ne les couvre.
+      </div>
+      <div class="sde-diff-example">Ex&nbsp;: divorce d'Elon Musk → tension sur TSLA avant tout consensus</div>
+    </div>
+
+    <div class="sde-diff-card">
+      <div class="sde-diff-icon" style="background:#E1F5EE;color:#085041">⚖️</div>
+      <div class="sde-diff-title">Score unique, pas dix indicateurs</div>
+      <div class="sde-diff-body">
+        Plutôt que de laisser l'utilisateur réconcilier un RSI suracheté, un P/E élevé et un sentiment
+        négatif, SDE les fusionne en <strong>un seul score pondéré</strong> avec une recommandation
+        claire : ACHETER, NEUTRE ou VENDRE.
+      </div>
+      <div class="sde-diff-example">Poids&nbsp;: Technique 40% · Fondamentaux 35% · Médiatique 25%</div>
+    </div>
+
+    <div class="sde-diff-card">
+      <div class="sde-diff-icon" style="background:#EFF6FF;color:#1D4ED8">🕯️</div>
+      <div class="sde-diff-title">Figures chartistes expliquées</div>
+      <div class="sde-diff-body">
+        La plupart des outils <em>détectent</em> un marteau ou une étoile du soir. SDE va plus loin&nbsp;:
+        il explique si le signal court terme <strong>converge ou contredit</strong> la recommandation
+        moyen terme, et vous dit quoi en penser.
+      </div>
+      <div class="sde-diff-example">Ex&nbsp;: « Marteau détecté il y a 2 jours — renforce la reco ACHETER »</div>
+    </div>
+
+    <div class="sde-diff-card">
+      <div class="sde-diff-icon" style="background:#FAECE7;color:#4A1B0C">🎯</div>
+      <div class="sde-diff-title">Zones de trading concrètes</div>
+      <div class="sde-diff-body">
+        SDE calcule une <strong>zone d'entrée</strong>, un <strong>objectif de cours</strong> et un
+        <strong>stop-loss</strong> basés sur l'ATR, les bandes de Bollinger et les supports/résistances
+        récents — pas des niveaux génériques.
+      </div>
+      <div class="sde-diff-example">Avec le ratio Risque/Rendement pour chaque signal</div>
+    </div>
+
+    <div class="sde-diff-card">
+      <div class="sde-diff-icon" style="background:#F3E8FF;color:#6B21A8">🤖</div>
+      <div class="sde-diff-title">Synthèse en langage naturel</div>
+      <div class="sde-diff-body">
+        Un LLM (LLaMA 3.3 70B) rédige une synthèse en français à partir des données réelles de l'analyse,
+        pas d'un prompt générique. Le texte reflète le score, les signaux contradictoires et le contexte
+        sectoriel du moment.
+      </div>
+      <div class="sde-diff-example">Groq (cloud) · Ollama (local, 100% privé) · fallback sans LLM</div>
+    </div>
+
+    <div class="sde-diff-card">
+      <div class="sde-diff-icon" style="background:#ECFDF5;color:#065F46">📡</div>
+      <div class="sde-diff-title">Sentiment presse en temps réel</div>
+      <div class="sde-diff-body">
+        SDE agrège des dizaines d'articles (NewsAPI + flux RSS) et leur applique une analyse de sentiment
+        NLP. Un article très négatif sur un CEO pèse plus qu'un commentaire neutre — le score médiatique
+        reflète l'intensité, pas seulement la polarité.
+      </div>
+      <div class="sde-diff-example">VADER (défaut) · FinBERT financier (optionnel)</div>
+    </div>
+
+  </div>
+</div>
+
+<p class="sde-disclaimer mt-5">
+  SDE est un outil d'aide à la décision. Les informations fournies ne constituent pas un conseil financier.
+</p>
+
 {% endblock %}
 
 {% block scripts %}
 <script>
-function fillSearch(term) {
-  const input = document.getElementById("sde-search-input");
-  if (!input) return;
-  input.value = term;
-  input.dispatchEvent(new Event("input", { bubbles: true }));
-  input.focus();
+function heroFill(term) {
+  const el = document.getElementById("sde-hero-input");
+  if (!el) return;
+  el.value = term;
+  el.dispatchEvent(new Event("input", { bubbles: true }));
+  el.focus();
 }
 </script>
 {% endblock %}

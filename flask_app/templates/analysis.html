@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block title %}SDE — {{ ticker }}{% endblock %}
 
-{# Macros couleur selon recommandation #}
+{# ── Palette selon recommandation ── #}
 {% set reco_theme = {
   'ACHETER': {'main':'#1D9E75','bg':'#E1F5EE','bd':'#5DCAA5','txt':'#085041','icon':'▲'},
   'VENDRE':  {'main':'#D85A30','bg':'#FAECE7','bd':'#F0997B','txt':'#4A1B0C','icon':'▼'},
@@ -11,111 +11,116 @@
 
 {% block content %}
 
-<!-- ══ CHARGEMENT INITIAL (masqué après rendu) ══════════════════════════════ -->
-<div id="sde-loading-done" class="d-none"></div>
+<!-- ══ EN-TÊTE TICKER ════════════════════════════════════════════════════════ -->
+<div class="sde-ticker-header">
 
-<!-- ══ EN-TÊTE ══════════════════════════════════════════════════════════════ -->
-<div class="d-flex align-items-center gap-2 mb-1 flex-wrap">
-  <h4 class="fw-bold mb-0">{{ res.company_name }}</h4>
-  <span class="text-muted">·</span>
-  <span class="fw-semibold" style="color:{{ th.main }}">{{ ticker }}</span>
-  {% if market.sector and market.sector not in ['N/A', 'n/a', ''] %}
-  <span class="badge rounded-pill"
-        style="background:#f3f4f6;color:#6b7280;font-weight:500;font-size:.72rem">
-    {{ market.sector }}
-  </span>
-  {% endif %}
+  <!-- Infos société -->
+  <div style="flex:1;min-width:0">
+    <div class="d-flex align-items-center flex-wrap gap-2">
+      <span class="sde-ticker-name">{{ res.company_name }}</span>
+      <span class="sde-ticker-sym" style="color:{{ th.main }}">{{ ticker }}</span>
+      {% if market.sector and market.sector not in ['N/A','n/a',''] %}
+      <span style="background:#F1F5F9;color:var(--sde-muted);border-radius:5px;
+                   padding:2px 8px;font-size:.72rem;font-weight:500">{{ market.sector }}</span>
+      {% endif %}
+    </div>
+    <div class="sde-ticker-meta mt-1">
+      CEO : {{ res.ceo_name or '—' }}
+      {% if market.industry and market.industry not in ['N/A','n/a',''] %} · {{ market.industry }}{% endif %}
+    </div>
+  </div>
 
-  {% if current_user.is_authenticated %}
-  <button id="sde-wl-btn"
-          class="btn btn-sm ms-auto {% if in_watchlist %}btn-warning{% else %}btn-outline-secondary{% endif %}"
-          data-ticker="{{ ticker }}"
-          data-company="{{ res.company_name | e }}"
-          data-in="{{ 'true' if in_watchlist else 'false' }}"
-          title="{% if in_watchlist %}Retirer de la watchlist{% else %}Ajouter à la watchlist{% endif %}">
-    <i class="bi {% if in_watchlist %}bi-bookmark-star-fill{% else %}bi-bookmark-star{% endif %} me-1"></i>
-    <span>{% if in_watchlist %}Dans la watchlist{% else %}Ajouter{% endif %}</span>
-  </button>
-  {% endif %}
+  <!-- Actions -->
+  <div class="d-flex align-items-center gap-2 ms-auto">
+    {% if current_user.is_authenticated %}
+    <button id="sde-wl-btn"
+            class="sde-nav-btn"
+            data-ticker="{{ ticker }}"
+            data-company="{{ res.company_name | e }}"
+            data-in="{{ 'true' if in_watchlist else 'false' }}"
+            title="{% if in_watchlist %}Retirer de la watchlist{% else %}Ajouter à la watchlist{% endif %}"
+            {% if in_watchlist %}
+            style="background:#FEF3C7;border-color:#F59E0B;color:#92400E"
+            {% endif %}>
+      <i class="bi {% if in_watchlist %}bi-bookmark-star-fill{% else %}bi-bookmark-star{% endif %} me-1"></i>
+      <span class="hide-xs">{% if in_watchlist %}Watchlist{% else %}Ajouter{% endif %}</span>
+    </button>
+    {% endif %}
+    <a href="{{ url_for('stock.analyze', ticker=ticker) }}?nocache=1"
+       class="sde-nav-btn" title="Régénérer l'analyse">
+      <i class="bi bi-arrow-clockwise"></i>
+    </a>
+  </div>
+
 </div>
-<p class="text-muted small mb-3">
-  CEO : {{ res.ceo_name or '—' }}
-  {% if market.industry and market.industry not in ['N/A', 'n/a', ''] %} · {{ market.industry }}{% endif %}
-</p>
 
-<hr class="sde-divider mb-3">
+<!-- ══ MÉTRIQUES LIVE ════════════════════════════════════════════════════════ -->
+{% set var  = market.var_1d if market.var_1d is not none else 0.0 %}
+{% set cvar = '#1D9E75' if var >= 0 else '#D85A30' %}
+{% set arr  = '▲' if var >= 0 else '▼' %}
+{% set rsi  = market.rsi %}
+{% set rsi_c = '#D85A30' if rsi > 70 else '#1D9E75' if rsi < 30 else 'var(--sde-text)' %}
+{% set v5   = market.var_5d %}
 
-<!-- ══ PRIX + MÉTRIQUES ══════════════════════════════════════════════════════ -->
 <div class="row g-2 mb-3">
 
   <!-- Prix live -->
-  {% set var  = market.var_1d if market.var_1d is not none else 0.0 %}
-  {% set cvar = '#1D9E75' if var >= 0 else '#D85A30' %}
-  {% set arr  = '▲' if var >= 0 else '▼' %}
-  <div class="col-12 col-md-5">
-    <div class="card border-0 shadow-sm p-3">
-      <div class="text-muted small mb-1">Prix live</div>
-      <div style="font-size:2.2rem;font-weight:600;color:{{ cvar }};line-height:1">
+  <div class="col-12 col-sm-5 col-lg-4">
+    <div class="sde-card h-100">
+      <div class="sde-section-title">Prix live</div>
+      <div style="font-size:2rem;font-weight:600;color:{{ cvar }};line-height:1.1">
         {{ sym }}{{ "%.2f"|format(market.price) }}
-        <span style="font-size:.9rem;font-weight:500;margin-left:8px;vertical-align:middle">
+        <span style="font-size:.85rem;font-weight:500;margin-left:6px;vertical-align:middle">
           {{ arr }} {{ "%+.2f"|format(var) }}%
         </span>
       </div>
-      <div class="text-muted" style="font-size:.72rem;margin-top:4px">
+      <div style="font-size:.72rem;color:var(--sde-muted);margin-top:4px">
         {% if market.prev_close %}
           Clôt. préc. <strong>{{ sym }}{{ "%.2f"|format(market.prev_close) }}</strong>
         {% endif %}
         {% if market.pre_market %}
-          &nbsp;·&nbsp; Pré-marché
-          <strong>{{ sym }}{{ "%.2f"|format(market.pre_market) }}</strong>
+          &nbsp;·&nbsp; Pré-marché <strong>{{ sym }}{{ "%.2f"|format(market.pre_market) }}</strong>
         {% elif market.post_market %}
-          &nbsp;·&nbsp; Post-marché
-          <strong>{{ sym }}{{ "%.2f"|format(market.post_market) }}</strong>
+          &nbsp;·&nbsp; Post-marché <strong>{{ sym }}{{ "%.2f"|format(market.post_market) }}</strong>
         {% endif %}
       </div>
     </div>
   </div>
 
   <!-- RSI -->
-  {% set rsi = market.rsi %}
-  {% set rsi_c = '#D85A30' if rsi > 70 else '#1D9E75' if rsi < 30 else '#374151' %}
-  <div class="col-4 col-md">
-    <div class="card border-0 shadow-sm p-3 text-center h-100">
-      <div class="text-muted small">RSI 14j</div>
-      <div style="font-size:1.6rem;font-weight:600;color:{{ rsi_c }}">
-        {{ "%.1f"|format(rsi) }}
-      </div>
-      <div class="text-muted" style="font-size:.7rem">
-        {{ 'Suracheté' if rsi > 70 else 'Survendu' if rsi < 30 else 'Neutre' }}
-      </div>
+  <div class="col-4 col-sm col-lg">
+    <div class="sde-card h-100 text-center">
+      <div class="sde-section-title">RSI 14j</div>
+      <div class="sde-metric-val" style="color:{{ rsi_c }}">{{ "%.1f"|format(rsi) }}</div>
+      <div class="sde-metric-label">{{ 'Suracheté' if rsi > 70 else 'Survendu' if rsi < 30 else 'Neutre' }}</div>
     </div>
   </div>
 
   <!-- Var 5j -->
-  {% set v5 = market.var_5d %}
-  <div class="col-4 col-md">
-    <div class="card border-0 shadow-sm p-3 text-center h-100">
-      <div class="text-muted small">Var. 5j</div>
-      <div style="font-size:1.6rem;font-weight:600;color:{{ '#1D9E75' if v5>=0 else '#D85A30' }}">
+  <div class="col-4 col-sm col-lg">
+    <div class="sde-card h-100 text-center">
+      <div class="sde-section-title">Var. 5j</div>
+      <div class="sde-metric-val" style="color:{{ '#1D9E75' if v5 >= 0 else '#D85A30' }}">
         {{ "%+.2f"|format(v5) }}%
       </div>
+      <div class="sde-metric-label">5 derniers jours</div>
     </div>
   </div>
 
-  <!-- Vol. ratio -->
-  <div class="col-4 col-md">
-    <div class="card border-0 shadow-sm p-3 text-center h-100">
-      <div class="text-muted small">Vol. ratio</div>
-      <div style="font-size:1.6rem;font-weight:600;color:#374151">
-        {{ "%.1f"|format(market.vol_ratio) }}×
-      </div>
+  <!-- Volume ratio -->
+  <div class="col-4 col-sm col-lg">
+    <div class="sde-card h-100 text-center">
+      <div class="sde-section-title">Vol. ratio</div>
+      <div class="sde-metric-val">{{ "%.1f"|format(market.vol_ratio) }}×</div>
+      <div class="sde-metric-label">vs. moy. 20j</div>
     </div>
   </div>
+
 </div>
 
 <!-- ══ FONDAMENTAUX ══════════════════════════════════════════════════════════ -->
-<div class="card border-0 shadow-sm p-3 mb-3">
-  <div class="sde-section-label mb-2">Données fondamentales</div>
+<div class="sde-card mb-3">
+  <div class="sde-section-title">Données fondamentales</div>
   <div class="row g-2 text-center">
     {% for label, val in [
         ('P/E',        market.pe_ratio),
@@ -124,48 +129,48 @@
         ('Croiss. CA', market.revenue_growth),
     ] %}
     <div class="col-6 col-md-3">
-      <div class="text-muted" style="font-size:.72rem">{{ label }}</div>
-      <div class="fw-semibold">{{ val if val not in [None, '', 'N/A'] else '—' }}</div>
+      <div style="font-size:.7rem;color:var(--sde-muted);margin-bottom:3px">{{ label }}</div>
+      <div style="font-weight:600;font-size:.95rem">{{ val if val not in [None, '', 'N/A'] else '—' }}</div>
     </div>
     {% endfor %}
   </div>
 </div>
 
-<hr class="sde-divider mb-3">
+<hr class="sde-divider">
 
 <!-- ══ SCORES + RECOMMANDATION ══════════════════════════════════════════════ -->
 <div class="row g-3 mb-3">
 
   <!-- Recommandation -->
   <div class="col-12 col-md-4">
-    <div class="card border-0 shadow-sm p-3 h-100">
-      <div class="sde-section-label mb-3">Recommandation</div>
-      <div style="display:inline-block;padding:8px 20px;border-radius:8px;
-                  background:{{ th.bg }};border:0.5px solid {{ th.bd }};margin-bottom:8px">
-        <span style="font-size:2rem;font-weight:500;color:{{ th.txt }}">
+    <div class="sde-card h-100">
+      <div class="sde-section-title">Recommandation</div>
+      <div style="display:inline-block;padding:10px 22px;border-radius:8px;margin-bottom:10px;
+                  background:{{ th.bg }};border:1px solid {{ th.bd }}">
+        <span style="font-size:1.9rem;font-weight:500;color:{{ th.txt }}">
           {{ th.icon }} {{ res.recommandation }}
         </span>
       </div>
-      <div class="text-muted small">
-        Confiance&nbsp;: {{ "%.2f"|format(res.score_global) }}/100
+      <div style="font-size:.78rem;color:var(--sde-muted)">
+        Confiance&nbsp;: <strong>{{ "%.2f"|format(res.score_global) }}/100</strong>
         &nbsp;·&nbsp; Sentiment&nbsp;: {{ res.sentiment.label }}
       </div>
     </div>
   </div>
 
-  <!-- Jauge SVG + composantes (J8) -->
+  <!-- Jauge + décomposition -->
   <div class="col-12 col-md-8">
-    <div class="card border-0 shadow-sm p-3 h-100">
-      <div class="sde-section-label mb-2">Score global &amp; décomposition</div>
+    <div class="sde-card h-100">
+      <div class="sde-section-title">Score global &amp; décomposition</div>
 
-      <!-- Jauge demi-cercle + score -->
       {% set arc_len    = (res.score_global / 100 * 314.16) | round(1) %}
       {% set needle_deg = (res.score_global * 1.8 - 90)     | round(1) %}
+
       <div class="d-flex align-items-center gap-3 mb-3">
-        <svg viewBox="0 0 240 145" style="flex:0 0 auto;width:clamp(120px,45%,180px);display:block">
+        <!-- Jauge SVG -->
+        <svg viewBox="0 0 240 145" style="flex:0 0 auto;width:clamp(110px,40%,170px)">
           <defs>
-            <linearGradient id="sde-gv" x1="20" y1="0" x2="220" y2="0"
-                            gradientUnits="userSpaceOnUse">
+            <linearGradient id="sde-gv" x1="20" y1="0" x2="220" y2="0" gradientUnits="userSpaceOnUse">
               <stop offset="0%"   stop-color="#F5C4B3"/>
               <stop offset="50%"  stop-color="#9FE1CB"/>
               <stop offset="100%" stop-color="#1D9E75"/>
@@ -173,39 +178,29 @@
             <mask id="sde-gm">
               <rect x="0" y="0" width="240" height="145" fill="black"/>
               <path d="M 20 125 A 100 100 0 0 1 220 125"
-                    fill="none" stroke="white" stroke-width="20"
-                    stroke-linecap="round"
+                    fill="none" stroke="white" stroke-width="20" stroke-linecap="round"
                     stroke-dasharray="{{ arc_len }} 314.16"/>
             </mask>
           </defs>
-          <!-- Arc fond -->
           <path d="M 20 125 A 100 100 0 0 1 220 125"
-                fill="none" stroke="#f0f0f0" stroke-width="20"
-                stroke-linecap="round"/>
-          <!-- Arc dégradé coral→teal -->
-          <rect x="0" y="0" width="240" height="145"
-                fill="url(#sde-gv)" mask="url(#sde-gm)"/>
-          <!-- Aiguille -->
+                fill="none" stroke="#f0f0f0" stroke-width="20" stroke-linecap="round"/>
+          <rect x="0" y="0" width="240" height="145" fill="url(#sde-gv)" mask="url(#sde-gm)"/>
           <line x1="120" y1="125" x2="120" y2="32"
-                stroke="#9ca3af" stroke-width="1.5" stroke-dasharray="3 3"
-                stroke-linecap="round"
+                stroke="#9ca3af" stroke-width="1.5" stroke-dasharray="3 3" stroke-linecap="round"
                 style="transform-origin:120px 125px;transform:rotate({{ needle_deg }}deg)"/>
-          <!-- Pivot -->
           <circle cx="120" cy="125" r="5" fill="#374151"/>
           <circle cx="120" cy="125" r="2.5" fill="white"/>
-          <!-- Labels -->
-          <text x="14"  y="140" font-size="9" fill="#9ca3af" text-anchor="middle" font-family="Arial">0</text>
-          <text x="120" y="18"  font-size="9" fill="#9ca3af" text-anchor="middle" font-family="Arial">50</text>
-          <text x="226" y="140" font-size="9" fill="#9ca3af" text-anchor="middle" font-family="Arial">100</text>
+          <text x="14"  y="140" font-size="9" fill="#9ca3af" text-anchor="middle" font-family="sans-serif">0</text>
+          <text x="120" y="18"  font-size="9" fill="#9ca3af" text-anchor="middle" font-family="sans-serif">50</text>
+          <text x="226" y="140" font-size="9" fill="#9ca3af" text-anchor="middle" font-family="sans-serif">100</text>
         </svg>
 
-        <!-- Score + badge reco -->
         <div>
-          <div style="font-size:.65rem;color:#9ca3af;text-transform:uppercase;
-                      letter-spacing:.5px;margin-bottom:2px">Score global</div>
-          <div style="font-size:2.8rem;font-weight:500;line-height:1;
-                      color:{{ th.main }}">{{ "%.2f"|format(res.score_global) }}</div>
-          <div style="font-size:.7rem;color:#9ca3af;margin-bottom:8px">/ 100</div>
+          <div style="font-size:.62rem;color:var(--sde-muted);text-transform:uppercase;letter-spacing:.5px">Score global</div>
+          <div style="font-size:2.6rem;font-weight:500;line-height:1;color:{{ th.main }}">
+            {{ "%.2f"|format(res.score_global) }}
+          </div>
+          <div style="font-size:.68rem;color:var(--sde-muted);margin-bottom:8px">/ 100</div>
           <div style="display:inline-block;font-size:.75rem;font-weight:500;
                       padding:4px 14px;border-radius:6px;
                       background:{{ th.bg }};color:{{ th.txt }};border:1px solid {{ th.bd }}">
@@ -214,68 +209,78 @@
         </div>
       </div>
 
-      <!-- 3 composantes enrichies -->
+      <!-- 3 composantes -->
       <div class="row g-2">
         {% set comp_themes = [
-          ('Technique',   res.score_tech,  '40%',
-           '#0C447C','#E6F1FB','#85B7EB','#185FA5',
+          ('Technique',    res.score_tech,  '40%', '#0C447C','#E6F1FB','#85B7EB','#185FA5',
            'RSI · MA · MACD · Volume',
-           'Mesure la dynamique du cours : indique si le titre est en tendance haussière ou baissière à court terme.'),
-          ('Fondamentaux', res.score_fund, '35%',
-           '#27500A','#EAF3DE','#97C459','#3B6D11',
+           'Dynamique du cours et tendance court terme.'),
+          ('Fondamentaux', res.score_fund,  '35%', '#27500A','#EAF3DE','#97C459','#3B6D11',
            'P/E · EPS · Dette · Croiss. CA',
-           'Évalue la santé financière de la société : reflète la solidité économique réelle de l\'entreprise.'),
-          ('Médiatique',  res.score_media, '25%',
-           '#633806','#FAEEDA','#EF9F27','#854F0B',
+           'Santé financière et solidité économique.'),
+          ('Médiatique',   res.score_media, '25%', '#633806','#FAEEDA','#EF9F27','#854F0B',
            'Sentiment · Insider · Alertes CEO',
-           'Analyse la presse et les dirigeants : capte les signaux humains et médiatiques autour du titre.'),
+           'Signaux presse et dirigeants.'),
         ] %}
         {% for label, score, poids, ctxt, cbg, cbd, cbar, indicators, explanation in comp_themes %}
         <div class="col-12 col-sm-4">
-          <div style="background:{{ cbg }};border:0.5px solid {{ cbd }};
-                      border-radius:8px;padding:10px 12px">
+          <div style="background:{{ cbg }};border:1px solid {{ cbd }};border-radius:8px;padding:10px 12px">
             <div class="d-flex justify-content-between align-items-baseline mb-1">
               <span style="font-size:.75rem;font-weight:500;color:{{ ctxt }}">{{ label }}</span>
-              <span style="font-size:.6rem;color:{{ ctxt }};border:0.5px solid {{ cbd }};
-                           border-radius:3px;padding:0 4px">{{ poids }}</span>
+              <span style="font-size:.6rem;color:{{ ctxt }};border:1px solid {{ cbd }};border-radius:3px;padding:0 4px">{{ poids }}</span>
             </div>
-            <div style="font-size:1.5rem;font-weight:500;color:{{ cbar }};line-height:1;margin-bottom:5px">
+            <div style="font-size:1.45rem;font-weight:500;color:{{ cbar }};line-height:1;margin-bottom:5px">
               {{ "%.2f"|format(score) }}
             </div>
-            <div style="height:4px;background:#e5e7eb;border-radius:2px;overflow:hidden;margin-bottom:7px">
-              <div style="height:4px;width:{{ score }}%;background:{{ cbar }};border-radius:2px"></div>
+            <div class="sde-bar-track mb-2">
+              <div class="sde-bar-fill" style="width:{{ score }}%;background:{{ cbar }}"></div>
             </div>
-            <div style="font-size:.65rem;color:#6b7280;margin-bottom:4px">{{ indicators }}</div>
-            <div style="height:.5px;background:#e5e7eb;margin-bottom:4px"></div>
-            <div style="font-size:.6rem;color:#6b7280;line-height:1.4;font-style:italic">
-              {{ explanation }}
-            </div>
+            <div style="font-size:.64rem;color:var(--sde-muted);margin-bottom:3px">{{ indicators }}</div>
+            <div style="font-size:.6rem;color:var(--sde-muted);line-height:1.4;font-style:italic">{{ explanation }}</div>
           </div>
         </div>
         {% endfor %}
       </div>
+
     </div>
+  </div>
+</div>
+
+<!-- ══ ANALYSE IA ════════════════════════════════════════════════════════════ -->
+<div class="sde-card mb-3">
+  <div class="sde-section-title">Analyse par IA</div>
+  {% set exp = res.explication %}
+  <div style="border:1px solid {{ th.bd }};border-left:4px solid {{ th.main }};
+              border-radius:8px;padding:12px 16px;font-size:.875rem;
+              line-height:1.6;background:{{ th.bg }}">
+    {{ exp.texte if exp else 'Explication non disponible.' }}
+  </div>
+  <div style="font-size:.72rem;color:var(--sde-muted);margin-top:6px">
+    {% if exp %}
+      {% set src_labels = {
+        'groq':    'Généré par LLaMA 3.3 70B via Groq',
+        'ollama':  'Généré par Mistral en local (Ollama)',
+        'fallback':'Texte généré localement (LLM indisponible)'
+      } %}
+      {{ src_labels.get(exp.source, exp.source) }}
+    {% endif %}
   </div>
 </div>
 
 <!-- ══ ZONES DE TRADING ══════════════════════════════════════════════════════ -->
 {% if zones %}
-<div class="card border-0 shadow-sm p-3 mb-3">
-  <div class="sde-section-label mb-2">Zones de Trading</div>
+<div class="sde-card mb-3">
+  <div class="sde-section-title">Zones de Trading</div>
   <div class="row g-2 mb-2">
 
     <!-- Zone d'entrée -->
     <div class="col-12 col-md-4">
-      <div style="background:{{ th.bg }};border:0.5px solid {{ th.bd }};border-radius:8px;padding:12px 14px">
-        <div style="font-size:.7rem;font-weight:500;color:{{ th.txt }};text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px">Zone d'entrée</div>
-        <div style="font-size:1.4rem;font-weight:500;color:{{ th.main }};line-height:1">
-          {{ sym }}{{ "%.2f"|format(zones.entry_low) }}
-        </div>
-        <div style="font-size:.82rem;color:{{ th.main }};margin:2px 0 6px">
-          → {{ sym }}{{ "%.2f"|format(zones.entry_high) }}
-        </div>
-        <div style="height:.5px;background:{{ th.bd }};margin-bottom:6px"></div>
-        <div style="font-size:.7rem;color:#6b7280;line-height:1.4">{{ zones.motif_entree }}</div>
+      <div style="background:{{ th.bg }};border:1px solid {{ th.bd }};border-radius:8px;padding:12px 14px">
+        <div style="font-size:.68rem;font-weight:500;color:{{ th.txt }};text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px">Zone d'entrée</div>
+        <div style="font-size:1.35rem;font-weight:500;color:{{ th.main }};line-height:1">{{ sym }}{{ "%.2f"|format(zones.entry_low) }}</div>
+        <div style="font-size:.82rem;color:{{ th.main }};margin:2px 0 6px">→ {{ sym }}{{ "%.2f"|format(zones.entry_high) }}</div>
+        <hr style="border-color:{{ th.bd }};margin:6px 0">
+        <div style="font-size:.7rem;color:var(--sde-muted);line-height:1.4">{{ zones.motif_entree }}</div>
       </div>
     </div>
 
@@ -283,19 +288,17 @@
     <div class="col-12 col-md-4">
       {% set pct_t = zones.pct_target %}
       {% set tc = '#1D9E75' if (pct_t or 0) > 0 else '#D85A30' %}
-      <div style="background:#f8fafc;border:0.5px solid #e5e7eb;border-radius:8px;padding:12px 14px">
-        <div style="font-size:.7rem;font-weight:500;color:#374151;text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px">Objectif cible</div>
-        <div style="font-size:1.4rem;font-weight:500;color:#374151;line-height:1">
-          {{ sym }}{{ "%.2f"|format(zones.target_low) }}
-        </div>
-        <div style="font-size:.82rem;color:#374151;margin:2px 0 6px">
+      <div style="background:#F8FAFC;border:1px solid var(--sde-border);border-radius:8px;padding:12px 14px">
+        <div style="font-size:.68rem;font-weight:500;color:var(--sde-text);text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px">Objectif cible</div>
+        <div style="font-size:1.35rem;font-weight:500;color:var(--sde-text);line-height:1">{{ sym }}{{ "%.2f"|format(zones.target_low) }}</div>
+        <div style="font-size:.82rem;color:var(--sde-text);margin:2px 0 6px">
           → {{ sym }}{{ "%.2f"|format(zones.target_high) }}
           {% if pct_t is not none %}
           <span style="color:{{ tc }};font-size:.7rem">({{ "%+.1f"|format(pct_t) }}%)</span>
           {% endif %}
         </div>
-        <div style="height:.5px;background:#e5e7eb;margin-bottom:6px"></div>
-        <div style="font-size:.7rem;color:#6b7280;line-height:1.4">{{ zones.motif_cible }}</div>
+        <hr style="border-color:var(--sde-border);margin:6px 0">
+        <div style="font-size:.7rem;color:var(--sde-muted);line-height:1.4">{{ zones.motif_cible }}</div>
       </div>
     </div>
 
@@ -303,43 +306,39 @@
     <div class="col-12 col-md-4">
       {% if zones.stop_loss is not none %}
       {% set pct_s = zones.pct_stop %}
-      <div style="background:#FEF2F2;border:0.5px solid #FECACA;border-radius:8px;padding:12px 14px">
-        <div style="font-size:.7rem;font-weight:500;color:#991b1b;text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px">Stop-loss</div>
-        <div style="font-size:1.4rem;font-weight:500;color:#DC2626;line-height:1">
-          {{ sym }}{{ "%.2f"|format(zones.stop_loss) }}
-        </div>
+      <div style="background:#FEF2F2;border:1px solid #FECACA;border-radius:8px;padding:12px 14px">
+        <div style="font-size:.68rem;font-weight:500;color:#991b1b;text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px">Stop-loss</div>
+        <div style="font-size:1.35rem;font-weight:500;color:#DC2626;line-height:1">{{ sym }}{{ "%.2f"|format(zones.stop_loss) }}</div>
         <div style="font-size:.82rem;color:#DC2626;margin:2px 0 6px">
           {% if pct_s is not none %}({{ "%+.1f"|format(pct_s) }}%){% endif %}
         </div>
-        <div style="height:.5px;background:#FECACA;margin-bottom:6px"></div>
-        <div style="font-size:.7rem;color:#6b7280;line-height:1.4">
+        <hr style="border-color:#FECACA;margin:6px 0">
+        <div style="font-size:.7rem;color:var(--sde-muted);line-height:1.4">
           Invalidation du signal
           {% if zones.rr_ratio %}<br><strong>R/R : {{ "%.1f"|format(zones.rr_ratio) }}:1</strong>{% endif %}
         </div>
       </div>
       {% elif zones.support_ref is not none %}
-      <div style="background:#FAEEDA;border:0.5px solid #EF9F27;border-radius:8px;padding:12px 14px">
-        <div style="font-size:.7rem;font-weight:500;color:#412402;text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px">Support (BB)</div>
-        <div style="font-size:1.4rem;font-weight:500;color:#BA7517;line-height:1">
-          {{ sym }}{{ "%.2f"|format(zones.support_ref) }}
-        </div>
-        <div style="height:.5px;background:#EF9F27;margin:10px 0 6px"></div>
-        <div style="font-size:.7rem;color:#6b7280;line-height:1.4">Niveau de support · pas de stop directionnel</div>
+      <div style="background:#FAEEDA;border:1px solid #EF9F27;border-radius:8px;padding:12px 14px">
+        <div style="font-size:.68rem;font-weight:500;color:#412402;text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px">Support (BB)</div>
+        <div style="font-size:1.35rem;font-weight:500;color:#BA7517;line-height:1">{{ sym }}{{ "%.2f"|format(zones.support_ref) }}</div>
+        <hr style="border-color:#EF9F27;margin:10px 0 6px">
+        <div style="font-size:.7rem;color:var(--sde-muted);line-height:1.4">Niveau support · pas de stop directionnel</div>
       </div>
       {% else %}
-      <div style="background:#f8fafc;border:0.5px solid #e5e7eb;border-radius:8px;padding:12px 14px">
-        <div style="font-size:.7rem;font-weight:500;color:#9ca3af;text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px">Stop-loss</div>
-        <div style="font-size:1.4rem;font-weight:500;color:#d1d5db;line-height:1">—</div>
-        <div style="height:.5px;background:#e5e7eb;margin:10px 0 6px"></div>
-        <div style="font-size:.7rem;color:#9ca3af;line-height:1.4">Signal neutre · pas de direction</div>
+      <div style="background:#F8FAFC;border:1px solid var(--sde-border);border-radius:8px;padding:12px 14px">
+        <div style="font-size:.68rem;font-weight:500;color:var(--sde-muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px">Stop-loss</div>
+        <div style="font-size:1.35rem;font-weight:500;color:#D1D5DB;line-height:1">—</div>
+        <hr style="border-color:var(--sde-border);margin:10px 0 6px">
+        <div style="font-size:.7rem;color:var(--sde-muted);line-height:1.4">Signal neutre · pas de direction</div>
       </div>
       {% endif %}
     </div>
+
   </div>
 
-  <!-- ATR / support / résistance -->
   <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mt-1">
-    <span style="font-size:.7rem;color:#9ca3af">
+    <span style="font-size:.7rem;color:var(--sde-muted)">
       ATR(14) : {{ sym }}{{ "%.2f"|format(zones.atr) }}
       &nbsp;·&nbsp; Support 20j : {{ sym }}{{ "%.2f"|format(zones.support) }}
       &nbsp;·&nbsp; Résistance 20j : {{ sym }}{{ "%.2f"|format(zones.resistance) }}
@@ -352,37 +351,13 @@
 </div>
 {% endif %}
 
-<!-- ══ EXPLICATION LLM ══════════════════════════════════════════════════════ -->
-<div class="card border-0 shadow-sm p-3 mb-3">
-  <div class="sde-section-label mb-2">Analyse par IA</div>
-  {% set exp = res.explication %}
-  <div style="border:0.5px solid {{ th.bd }};border-left:4px solid {{ th.main }};
-              border-radius:8px;padding:12px 16px;font-size:.875rem;
-              line-height:1.6;background:{{ th.bg }}">
-    {{ exp.texte if exp else 'Explication non disponible.' }}
-  </div>
-  <div class="d-flex align-items-center justify-content-between mt-2">
-    <span class="text-muted" style="font-size:.72rem">
-      {% if exp %}
-        {% set src_labels = {'groq':'Généré par LLaMA 3.3 70B via Groq','ollama':'Généré par Mistral en local (Ollama)','fallback':'Texte généré localement (LLM indisponible)'} %}
-        {{ src_labels.get(exp.source, exp.source) }}
-      {% endif %}
-    </span>
-    <a href="{{ url_for('stock.analyze', ticker=ticker) }}?nocache=1"
-       class="btn btn-outline-secondary btn-sm py-0">
-      Régénérer
-    </a>
-  </div>
-</div>
-
-<hr class="sde-divider mb-3">
+<hr class="sde-divider">
 
 <!-- ══ GRAPHIQUES ═══════════════════════════════════════════════════════════ -->
-<div class="card border-0 shadow-sm p-4 mb-3">
-  <p class="sde-section-label">Graphiques</p>
+<div class="sde-card mb-3">
+  <div class="sde-section-title">Graphiques</div>
 
-  <!-- Onglets -->
-  <ul class="nav nav-tabs nav-tabs-sm mb-3" id="chartTabs" role="tablist">
+  <ul class="nav nav-tabs mb-3" id="chartTabs" role="tablist">
     <li class="nav-item" role="presentation">
       <button class="nav-link active" id="tab-price-btn" data-bs-toggle="tab"
               data-bs-target="#tab-price" type="button" role="tab">
@@ -391,91 +366,83 @@
     </li>
     <li class="nav-item" role="presentation">
       <button class="nav-link" id="tab-rsi-btn" data-bs-toggle="tab"
-              data-bs-target="#tab-rsi" type="button" role="tab">
-        RSI
-      </button>
+              data-bs-target="#tab-rsi" type="button" role="tab">RSI</button>
     </li>
     <li class="nav-item" role="presentation">
       <button class="nav-link" id="tab-candle-btn" data-bs-toggle="tab"
               data-bs-target="#tab-candle" type="button" role="tab">
-        <i class="bi bi-candlestick me-1"></i>Chandeliers
+        <i class="bi bi-bar-chart-line me-1"></i>Chandeliers
       </button>
     </li>
   </ul>
 
   <div class="tab-content" id="chartTabsContent">
 
-    <!-- Prix + Volume -->
     <div class="tab-pane fade show active" id="tab-price" role="tabpanel">
       {% if charts.price_b64 %}
       <img src="{{ charts.price_b64 }}" alt="Cours 30j" class="img-fluid w-100" loading="lazy">
       {% else %}
-      <p class="text-muted small text-center py-4">Graphique indisponible</p>
+      <p class="text-center text-muted small py-4">Graphique indisponible</p>
       {% endif %}
     </div>
 
-    <!-- RSI -->
     <div class="tab-pane fade" id="tab-rsi" role="tabpanel">
       {% if charts.rsi_b64 %}
       <img src="{{ charts.rsi_b64 }}" alt="RSI 14j" class="img-fluid w-100" loading="lazy">
       {% else %}
-      <p class="text-muted small text-center py-4">Graphique indisponible</p>
+      <p class="text-center text-muted small py-4">Graphique indisponible</p>
       {% endif %}
     </div>
 
-    <!-- Chandeliers Plotly -->
     <div class="tab-pane fade" id="tab-candle" role="tabpanel">
       {% if charts.candle_json %}
       <div id="sde-candle-chart" style="height:460px"></div>
       {% else %}
-      <p class="text-muted small text-center py-4">Graphique indisponible</p>
+      <p class="text-center text-muted small py-4">Graphique indisponible</p>
       {% endif %}
 
       {% if candle_pattern %}
       {% set _cp = candle_pattern %}
-      {% set _alert = 'success' if _cp.signal == 'bullish' else 'warning' if _cp.signal == 'bearish' else 'info' %}
-      {% set _border_color = '#1D9E75' if _cp.signal == 'bullish' else '#BA7517' if _cp.signal == 'bearish' else '#3B82F6' %}
+      {% set _bc = '#1D9E75' if _cp.signal == 'bullish' else '#BA7517' if _cp.signal == 'bearish' else '#3B82F6' %}
+      {% set _bg = '#E1F5EE' if _cp.signal == 'bullish' else '#FAEEDA' if _cp.signal == 'bearish' else '#EFF6FF' %}
       <div class="mt-3 p-3 rounded"
-           style="background:{{ '#E1F5EE' if _cp.signal == 'bullish' else '#FAEEDA' if _cp.signal == 'bearish' else '#EFF6FF' }};
-                  border:0.5px solid {{ _border_color }};border-left:4px solid {{ _border_color }};
+           style="background:{{ _bg }};border:1px solid {{ _bc }};border-left:4px solid {{ _bc }};
                   font-size:.85rem;line-height:1.6">
         <div class="mb-1">{{ _cp.p1 | safe }}</div>
-        <div class="text-muted" style="font-size:.8rem">{{ _cp.p2 | safe }}</div>
+        <div style="font-size:.8rem;color:var(--sde-muted)">{{ _cp.p2 | safe }}</div>
       </div>
       {% endif %}
     </div>
 
-  </div><!-- /tab-content -->
+  </div>
 </div>
 
-<!-- ══ SIGNAUX DÉTAILLÉS ════════════════════════════════════════════════════ -->
+<!-- ══ ACCORDÉONS ════════════════════════════════════════════════════════════ -->
+
 {% if signals_list %}
-<div class="accordion mb-3" id="accordionSignals">
-  <div class="accordion-item border-0 shadow-sm">
+<div class="accordion mb-2" id="accordionSignals">
+  <div class="accordion-item" style="border:1px solid var(--sde-border);border-radius:var(--sde-radius)">
     <h2 class="accordion-header">
       <button class="accordion-button collapsed py-2" type="button"
-              data-bs-toggle="collapse" data-bs-target="#collapseSignals">
-        <span class="sde-section-label mb-0 me-2">Signaux détaillés</span>
-        <span class="badge bg-secondary rounded-pill">{{ signals_list|length }}</span>
+              data-bs-toggle="collapse" data-bs-target="#collapseSignals"
+              style="font-size:.82rem;background:var(--sde-card);border-radius:var(--sde-radius)">
+        <span class="sde-section-title mb-0 me-2">Signaux détaillés</span>
+        <span class="badge bg-secondary rounded-pill" style="font-size:.7rem">{{ signals_list|length }}</span>
       </button>
     </h2>
     <div id="collapseSignals" class="accordion-collapse collapse">
       <div class="accordion-body p-0">
         <div class="table-responsive">
-          <table class="table table-sm table-hover mb-0" style="font-size:.8rem">
+          <table class="table table-sm table-hover mb-0" style="font-size:.78rem">
             <thead class="table-light">
-              <tr>
-                {% for col in signals_list[0].keys() %}
-                <th>{{ col }}</th>
-                {% endfor %}
-              </tr>
+              <tr>{% for col in signals_list[0].keys() %}<th>{{ col }}</th>{% endfor %}</tr>
             </thead>
             <tbody>
               {% for row in signals_list %}
               <tr>
                 {% for k, v in row.items() %}
                 <td {% if k == 'sens' %}
-                    style="color:{{'#166534' if v=='haussier' else '#991b1b' if v=='baissier' else '#374151'}};font-weight:500"
+                    style="color:{{'#166534' if v=='haussier' else '#991b1b' if v=='baissier' else 'inherit'}};font-weight:500"
                     {% endif %}>{{ v if v is not none else '—' }}</td>
                 {% endfor %}
               </tr>
@@ -489,21 +456,21 @@
 </div>
 {% endif %}
 
-<!-- ══ INSIDER ══════════════════════════════════════════════════════════════ -->
-<div class="accordion mb-3" id="accordionInsider">
-  <div class="accordion-item border-0 shadow-sm">
+<div class="accordion mb-2" id="accordionInsider">
+  <div class="accordion-item" style="border:1px solid var(--sde-border);border-radius:var(--sde-radius)">
     <h2 class="accordion-header">
       <button class="accordion-button collapsed py-2" type="button"
-              data-bs-toggle="collapse" data-bs-target="#collapseInsider">
-        <span class="sde-section-label mb-0 me-2">Activité des insiders</span>
-        <span class="badge bg-secondary rounded-pill">{{ insider_list|length }}</span>
+              data-bs-toggle="collapse" data-bs-target="#collapseInsider"
+              style="font-size:.82rem;background:var(--sde-card);border-radius:var(--sde-radius)">
+        <span class="sde-section-title mb-0 me-2">Activité des insiders</span>
+        <span class="badge bg-secondary rounded-pill" style="font-size:.7rem">{{ insider_list|length }}</span>
       </button>
     </h2>
     <div id="collapseInsider" class="accordion-collapse collapse">
       <div class="accordion-body p-0">
         {% if insider_list %}
         <div class="table-responsive">
-          <table class="table table-sm table-hover mb-0" style="font-size:.8rem">
+          <table class="table table-sm table-hover mb-0" style="font-size:.78rem">
             <thead class="table-light">
               <tr>{% for col in insider_list[0].keys() %}<th>{{ col }}</th>{% endfor %}</tr>
             </thead>
@@ -522,21 +489,21 @@
   </div>
 </div>
 
-<!-- ══ ACTUALITÉS ═══════════════════════════════════════════════════════════ -->
 <div class="accordion mb-3" id="accordionNews">
-  <div class="accordion-item border-0 shadow-sm">
+  <div class="accordion-item" style="border:1px solid var(--sde-border);border-radius:var(--sde-radius)">
     <h2 class="accordion-header">
       <button class="accordion-button collapsed py-2" type="button"
-              data-bs-toggle="collapse" data-bs-target="#collapseNews">
-        <span class="sde-section-label mb-0 me-2">Actualités analysées</span>
-        <span class="badge bg-secondary rounded-pill">{{ news_list|length }}</span>
+              data-bs-toggle="collapse" data-bs-target="#collapseNews"
+              style="font-size:.82rem;background:var(--sde-card);border-radius:var(--sde-radius)">
+        <span class="sde-section-title mb-0 me-2">Actualités analysées</span>
+        <span class="badge bg-secondary rounded-pill" style="font-size:.7rem">{{ news_list|length }}</span>
       </button>
     </h2>
     <div id="collapseNews" class="accordion-collapse collapse">
       <div class="accordion-body p-0">
         {% if news_list %}
         <div class="table-responsive">
-          <table class="table table-sm table-hover mb-0" style="font-size:.78rem">
+          <table class="table table-sm table-hover mb-0" style="font-size:.76rem">
             <thead class="table-light">
               <tr>
                 <th>Origine</th><th>Titre</th><th>Lien</th>
@@ -551,12 +518,11 @@
                 <td>{{ n.get('titre','') }}</td>
                 <td>
                   {% if n.get('url') %}
-                  <a href="{{ n.url }}" target="_blank" rel="noopener"
-                     class="sde-link">↗</a>
+                  <a href="{{ n.url }}" target="_blank" rel="noopener" style="color:var(--sde-teal)">↗</a>
                   {% endif %}
                 </td>
                 <td>
-                  <span style="font-size:.72rem;padding:1px 6px;border-radius:3px;
+                  <span style="font-size:.7rem;padding:1px 6px;border-radius:3px;
                     {% if sc=='positive' %}background:#dcfce7;color:#166534
                     {% elif sc=='negative' %}background:#fee2e2;color:#991b1b
                     {% else %}background:#f3f4f6;color:#6b7280{% endif %}">
@@ -579,17 +545,19 @@
   </div>
 </div>
 
+<p class="sde-disclaimer mt-2">
+  SDE est un outil d'aide à la décision. Ces informations ne constituent pas un conseil financier.
+</p>
+
 {% endblock %}
 
 {% block scripts %}
 <script>
 document.addEventListener("DOMContentLoaded", function () {
-  /* Masque l'overlay de chargement dès que la page est rendue */
   const overlay = document.getElementById("sde-page-loading");
   if (overlay) overlay.remove();
 
   {% if charts.candle_json %}
-  /* Rendu Plotly chandeliers au clic sur l'onglet (lazy) */
   const candleData = {{ charts.candle_json | safe }};
   let candleRendered = false;
 
@@ -598,13 +566,11 @@ document.addEventListener("DOMContentLoaded", function () {
     const el = document.getElementById("sde-candle-chart");
     if (!el || typeof Plotly === "undefined") return;
     Plotly.newPlot(el, candleData.data, candleData.layout, {
-      responsive: true,
-      displayModeBar: false,
+      responsive: true, displayModeBar: false,
     });
     candleRendered = true;
   }
 
-  /* Déclenche au clic sur l'onglet Chandeliers */
   const tabBtn = document.getElementById("tab-candle-btn");
   if (tabBtn) tabBtn.addEventListener("shown.bs.tab", renderCandle);
   {% endif %}
