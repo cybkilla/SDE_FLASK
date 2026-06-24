@@ -274,14 +274,31 @@
 
 <!-- ══ ZONES DE TRADING ══════════════════════════════════════════════════════ -->
 {% if zones %}
+{% set is_sell = res.recommandation == 'VENDRE' %}
+{% set is_buy  = res.recommandation == 'ACHETER' %}
 <div class="sde-card mb-3">
-  <div class="sde-section-title">Zones de Trading</div>
+  <div class="sde-section-title" style="display:flex;align-items:center;gap:8px">
+    Zones de Trading
+    {% if is_buy %}
+    <span style="font-size:.7rem;font-weight:600;background:#D1FAE5;color:#065F46;
+                 border:1px solid #6EE7B7;border-radius:4px;padding:2px 8px">
+      ↗ LONG — achat
+    </span>
+    {% elif is_sell %}
+    <span style="font-size:.7rem;font-weight:600;background:#FEE2E2;color:#991B1B;
+                 border:1px solid #FCA5A5;border-radius:4px;padding:2px 8px">
+      ↘ SHORT — vente
+    </span>
+    {% endif %}
+  </div>
   <div class="row g-2 mb-2">
 
     <!-- Zone d'entrée -->
     <div class="col-12 col-md-4">
       <div style="background:{{ th.bg }};border:1px solid {{ th.bd }};border-radius:8px;padding:12px 14px">
-        <div style="font-size:.68rem;font-weight:500;color:{{ th.txt }};text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px">Zone d'entrée</div>
+        <div style="font-size:.68rem;font-weight:500;color:{{ th.txt }};text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px">
+          {% if is_sell %}Zone de vente{% else %}Zone d'entrée{% endif %}
+        </div>
         <div style="font-size:1.35rem;font-weight:500;color:{{ th.main }};line-height:1">{{ sym }}{{ "%.2f"|format(zones.entry_low) }}</div>
         <div style="font-size:.82rem;color:{{ th.main }};margin:2px 0 6px">→ {{ sym }}{{ "%.2f"|format(zones.entry_high) }}</div>
         <hr style="border-color:{{ th.bd }};margin:6px 0">
@@ -294,7 +311,9 @@
       {% set pct_t = zones.pct_target %}
       {% set tc = '#1D9E75' if (pct_t or 0) > 0 else '#D85A30' %}
       <div style="background:#F8FAFC;border:1px solid var(--sde-border);border-radius:8px;padding:12px 14px">
-        <div style="font-size:.68rem;font-weight:500;color:var(--sde-text);text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px">Objectif cible</div>
+        <div style="font-size:.68rem;font-weight:500;color:var(--sde-text);text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px">
+          {% if is_sell %}Objectif de baisse{% else %}Objectif de hausse{% endif %}
+        </div>
         <div style="font-size:1.35rem;font-weight:500;color:var(--sde-text);line-height:1">{{ sym }}{{ "%.2f"|format(zones.target_low) }}</div>
         <div style="font-size:.82rem;color:var(--sde-text);margin:2px 0 6px">
           → {{ sym }}{{ "%.2f"|format(zones.target_high) }}
@@ -319,7 +338,7 @@
         </div>
         <hr style="border-color:#FECACA;margin:6px 0">
         <div style="font-size:.7rem;color:var(--sde-muted);line-height:1.4">
-          Invalidation du signal
+          {% if is_sell %}Rachat de protection (si le prix monte){% else %}Invalidation du signal{% endif %}
           {% if zones.rr_ratio %}<br><strong>R/R : {{ "%.1f"|format(zones.rr_ratio) }}:1</strong>{% endif %}
         </div>
       </div>
