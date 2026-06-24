@@ -71,35 +71,23 @@ def test_email():
     if not to_email:
         return jsonify({"error": "Aucune adresse email trouvée. Passez ?to=votre@email.com"}), 400
 
-    import os, traceback
-
-    # Lecture directe de l'environnement (bypass cache config.py)
-    api_key  = os.getenv("RESEND_API_KEY", "")
-    from_addr = os.getenv("RESEND_FROM", "SDE StockDecisionEngine <onboarding@resend.dev>")
-    # Variables RESEND présentes dans l'env (noms uniquement, pas les valeurs)
-    resend_keys_found = [k for k in os.environ if "RESEND" in k.upper()]
-
-    if not api_key:
-        return jsonify({
-            "ok": False,
-            "error": "RESEND_API_KEY vide dans l'environnement Render",
-            "resend_keys_found": resend_keys_found,
-        }), 500
-
     try:
-        import resend as _resend
-        _resend.api_key = api_key
-        result = _resend.Emails.send({
-            "from":    from_addr,
-            "to":      [to_email],
-            "subject": "[SDE] Test email Resend",
-            "html":    "<p>Test Resend OK — si vous recevez cet email, la configuration fonctionne.</p>",
-        })
-        return jsonify({
-            "ok": True,
-            "to": to_email,
-            "from": from_addr,
-            "resend_response": str(result),
-        }), 200
+        from alerts.mailer import send_alert
+        send_alert(
+            to_email      = to_email,
+            username      = "test_user",
+            ticker        = "AAPL",
+            company       = "Apple Inc.",
+            old_reco      = "NEUTRE",
+            new_reco      = "ACHETER",
+            score         = 72.5,
+            prix          = 213.49,
+            variation     = 6.3,
+            reco_changed  = True,
+            var_triggered = True,
+            context       = "Test de l'envoi email via Resend. Si vous recevez cet email, la configuration fonctionne correctement.",
+        )
+        return jsonify({"ok": True, "message": f"Email de test envoyé à {to_email}"}), 200
     except Exception as e:
+        import traceback
         return jsonify({"ok": False, "error": str(e), "trace": traceback.format_exc()}), 500

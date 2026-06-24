@@ -1,6 +1,6 @@
 # alerts/mailer.py — envoi d'emails via Resend (HTTP, port 443 — fonctionne sur Render)
+import os
 import resend
-from config import RESEND_API_KEY, RESEND_FROM
 
 
 def send_alert(to_email: str, username: str,
@@ -129,13 +129,16 @@ def send_alert(to_email: str, username: str,
     </div>
     """
 
-    if not RESEND_API_KEY:
+    api_key   = os.getenv("RESEND_API_KEY", "")
+    from_addr = os.getenv("RESEND_FROM", "SDE StockDecisionEngine <onboarding@resend.dev>")
+
+    if not api_key:
         print(f"[Mailer] RESEND_API_KEY manquante — email non envoyé à {to_email}", flush=True)
         return
 
-    resend.api_key = RESEND_API_KEY
+    resend.api_key = api_key
     resend.Emails.send({
-        "from":    RESEND_FROM,
+        "from":    from_addr,
         "to":      [to_email],
         "subject": subject,
         "html":    body,
