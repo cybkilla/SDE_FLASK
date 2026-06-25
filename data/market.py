@@ -306,10 +306,12 @@ def _get_finnhub_fallback(ticker: str) -> dict:
 # ══════════════════════════════════════════════════════════
 def get_live_price(ticker: str) -> dict:
     """
-    Retourne uniquement le prix actuel et la variation du jour via Finnhub.
-    Utilisé pour superposer un prix frais sur un snapshot Supabase de quelques heures.
-    Retourne {} si Finnhub indisponible (fallback : le snapshot garde son prix).
+    Retourne le prix actuel et la variation du jour.
+    Primaire : Finnhub /quote (léger).
+    Fallback  : yfinance fast_info si Finnhub indisponible (502, timeout…).
+    Retourne {} si les deux sources échouent.
     """
+    # ── Tentative Finnhub ─────────────────────────────────
     try:
         fh    = _fh()
         quote = fh.quote(ticker.upper()) or {}
@@ -325,7 +327,25 @@ def get_live_price(ticker: str) -> dict:
             "var_1d":     var_1d,
         }
     except Exception as e:
-        print(f"[Market] get_live_price({ticker}) erreur : {e}", flush=True)
+        print(f"[Market] Finnhub indisponible ({ticker}) : {type(e).__name__} — fallback yfinance", flush=True)
+
+    # ── Fallback yfinance fast_info ───────────────────────
+    try:
+        import yfinance as yf
+        fi    = yf.Ticker(ticker.upper()).fast_info
+        price = getattr(fi, "last_price", None)
+        prev  = getattr(fi, "previous_close", None)
+        if price and prev and float(prev) > 0:
+            var_1d = round((float(price) - float(prev)) / float(prev) * 100, 2)
+        else:
+            var_1d = 0.0
+        return {
+            "price":      round(float(price), 2) if price else None,
+            "prev_close": round(float(prev),  2) if prev  else None,
+            "var_1d":     var_1d,
+        }
+    except Exception as e2:
+        print(f"[Market] get_live_price({ticker}) tous les fallbacks ont échoué : {e2}", flush=True)
         return {}
 
 
