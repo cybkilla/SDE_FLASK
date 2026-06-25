@@ -587,6 +587,75 @@
   </div>
 </div>
 
+{% if current_user.is_authenticated %}
+<!-- ══ PORTFOLIO & CONSEIL ══════════════════════════════════════════════════ -->
+<div class="sde-card mt-3" id="sde-portfolio-section">
+
+  <div class="d-flex align-items-center justify-content-between mb-3">
+    <div class="sde-section-title mb-0">
+      <i class="bi bi-briefcase me-1"></i>Ma position · {{ ticker }}
+    </div>
+    <button class="sde-nav-btn" onclick="sdePortfolio.openAddModal()"
+            title="Enregistrer un achat">
+      <i class="bi bi-plus-circle me-1"></i><span class="hide-xs">Ajouter un achat</span>
+    </button>
+  </div>
+
+  <!-- Positions P&L -->
+  <div id="sde-positions-wrap">
+    <p class="text-muted small text-center py-2">
+      <span class="spinner-border spinner-border-sm me-1"></span>Chargement…
+    </p>
+  </div>
+
+  <!-- Conseil du jour -->
+  <div id="sde-advice-wrap" class="mt-3"></div>
+
+  <!-- Historique conseils -->
+  <div id="sde-advice-history-wrap"></div>
+
+</div>
+
+<!-- Modal ajout position -->
+<div class="modal fade" id="sde-position-modal" tabindex="-1">
+  <div class="modal-dialog modal-sm">
+    <div class="modal-content" style="border-radius:12px">
+      <div class="modal-header py-2 px-3" style="border-bottom:1px solid var(--sde-border)">
+        <h6 class="modal-title fw-semibold" style="font-size:.85rem">
+          <i class="bi bi-plus-circle me-1 text-success"></i>Enregistrer un achat — {{ ticker }}
+        </h6>
+        <button type="button" class="btn-close btn-sm" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body px-3 py-3">
+        <div class="mb-2">
+          <label class="form-label small fw-semibold">Date d'achat</label>
+          <input type="date" id="sde-pos-date" class="form-control form-control-sm">
+        </div>
+        <div class="mb-2">
+          <label class="form-label small fw-semibold">Quantité (actions)</label>
+          <input type="number" id="sde-pos-qty" class="form-control form-control-sm"
+                 placeholder="ex : 100" min="0.0001" step="any">
+        </div>
+        <div class="mb-3">
+          <label class="form-label small fw-semibold">Prix d'achat ($)</label>
+          <input type="number" id="sde-pos-price" class="form-control form-control-sm"
+                 placeholder="ex : 1.85" min="0.0001" step="any">
+        </div>
+        <div class="mb-3">
+          <label class="form-label small fw-semibold">Notes (optionnel)</label>
+          <input type="text" id="sde-pos-notes" class="form-control form-control-sm"
+                 placeholder="ex : DCA Mars 2023">
+        </div>
+        <div id="sde-pos-error" class="text-danger small mb-2 d-none"></div>
+        <button class="btn btn-sde-teal btn-sm w-100" onclick="sdePortfolio.submitAdd()">
+          <i class="bi bi-check-circle me-1"></i>Enregistrer
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
+
 <p class="sde-disclaimer mt-2">
   SDE est un outil d'aide à la décision. Ces informations ne constituent pas un conseil financier.
 </p>
@@ -595,6 +664,234 @@
 
 {% block scripts %}
 <script>
+/* ── Portfolio & Conseil ────────────────────────────────────────────────── */
+{% if current_user.is_authenticated %}
+const sdePortfolio = (function () {
+  const TICKER  = "{{ ticker }}";
+  const COMPANY = "{{ res.company_name | e }}";
+  const SYM     = "{{ sym }}";
+
+  const ACTION_COLOR = {
+    ACHETER:    "#1D9E75", RENFORCER: "#15803d",
+    TENIR:      "#BA7517", SURVEILLER: "#5a6a7a",
+    "ALLÉGER":  "#D85A30", VENDRE: "#991b1b",
+  };
+  const ACTION_ICON = {
+    ACHETER: "↑", RENFORCER: "↗", TENIR: "◆",
+    SURVEILLER: "◎", "ALLÉGER": "↘", VENDRE: "↓",
+  };
+
+  function _pct(v) {
+    const s = v >= 0 ? "+" : "";
+    return `<span style="color:${v >= 0 ? "#1D9E75" : "#D85A30"};font-weight:600">${s}${v.toFixed(2)}%</span>`;
+  }
+  function _curr(v) {
+    return v != null ? SYM + v.toFixed(2) : "—";
+  }
+
+  /* ── Positions ── */
+  function loadPositions() {
+    fetch(`/portfolio/positions/${TICKER}`)
+      .then(r => r.json()).then(data => {
+        const wrap = document.getElementById("sde-positions-wrap");
+        if (!data.ok || !data.summary) {
+          wrap.innerHTML = `<p class="text-muted small text-center py-1">
+            Aucune position enregistrée. Cliquez sur "+ Ajouter un achat" pour commencer.</p>`;
+          return;
+        }
+        const s = data.summary;
+        let rows = s.lots.map(l => `
+          <tr>
+            <td style="font-size:.78rem;color:var(--sde-muted)">${l.date_achat}</td>
+            <td style="font-size:.82rem">${parseFloat(l.quantite).toLocaleString()} actions</td>
+            <td style="font-size:.82rem">@ ${SYM}${parseFloat(l.prix_achat).toFixed(4)}</td>
+            <td>
+              <button class="btn btn-sm py-0 px-1" style="color:#D85A30;background:none;border:none"
+                      onclick="sdePortfolio.deletePos(${l.id})" title="Supprimer ce lot">
+                <i class="bi bi-trash3" style="font-size:.75rem"></i>
+              </button>
+            </td>
+          </tr>`).join("");
+
+        const pnlColor = s.pnl_euros >= 0 ? "#1D9E75" : "#D85A30";
+        wrap.innerHTML = `
+          <div class="table-responsive">
+            <table class="table table-sm mb-2" style="font-size:.82rem">
+              <thead><tr>
+                <th style="color:var(--sde-muted);font-weight:500">Date</th>
+                <th style="color:var(--sde-muted);font-weight:500">Quantité</th>
+                <th style="color:var(--sde-muted);font-weight:500">Prix achat</th>
+                <th></th>
+              </tr></thead>
+              <tbody>${rows}</tbody>
+            </table>
+          </div>
+          <div style="background:#F8FAFC;border-radius:8px;padding:10px 14px;display:flex;flex-wrap:wrap;gap:16px;font-size:.82rem">
+            <span><span style="color:var(--sde-muted)">Total</span> <strong>${parseFloat(s.total_shares).toLocaleString()} actions</strong></span>
+            <span><span style="color:var(--sde-muted)">Coût moyen</span> <strong>${SYM}${parseFloat(s.cout_moyen).toFixed(4)}</strong></span>
+            <span><span style="color:var(--sde-muted)">Investi</span> <strong>${SYM}${s.total_investi.toLocaleString(undefined,{minimumFractionDigits:2})}</strong></span>
+            <span><span style="color:var(--sde-muted)">Valeur actuelle</span> <strong>${SYM}${s.valeur_actuelle.toLocaleString(undefined,{minimumFractionDigits:2})}</strong></span>
+            <span><span style="color:var(--sde-muted)">P&L</span>
+              <strong style="color:${pnlColor}">
+                ${s.pnl_euros >= 0 ? "+" : ""}${SYM}${Math.abs(s.pnl_euros).toFixed(2)}
+                (${s.pnl_euros >= 0 ? "+" : ""}${s.pnl_pct.toFixed(2)}%)
+              </strong>
+            </span>
+          </div>`;
+      })
+      .catch(() => {
+        document.getElementById("sde-positions-wrap").innerHTML =
+          `<p class="text-danger small">Erreur de chargement des positions.</p>`;
+      });
+  }
+
+  /* ── Conseil du jour ── */
+  function loadAdvice() {
+    const wrap = document.getElementById("sde-advice-wrap");
+    wrap.innerHTML = `<p class="text-muted small text-center py-1">
+      <span class="spinner-border spinner-border-sm me-1"></span>Génération du conseil…</p>`;
+    fetch(`/portfolio/advice/${TICKER}`)
+      .then(r => r.json()).then(data => {
+        if (!data.ok) {
+          wrap.innerHTML = `<p class="text-muted small text-center py-1">${data.error || "Conseil non disponible"}</p>`;
+          loadHistory([]);
+          return;
+        }
+        const a     = data.advice;
+        const color = ACTION_COLOR[a.action] || "#5a6a7a";
+        const icon  = ACTION_ICON[a.action]  || "◆";
+        const qtyTxt = a.quantite_suggeree
+          ? ` · <strong>${parseFloat(a.quantite_suggeree).toLocaleString()} actions</strong>` : "";
+        const prixTxt = a.prix_jour
+          ? ` · Prix conseil ${SYM}${parseFloat(a.prix_jour).toFixed(2)}` : "";
+
+        wrap.innerHTML = `
+          <div style="border-left:4px solid ${color};padding:10px 14px;background:${color}11;border-radius:0 8px 8px 0">
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">
+              <span style="background:${color};color:#fff;padding:3px 10px;border-radius:20px;font-weight:700;font-size:.85rem">
+                ${icon} ${a.action}
+              </span>
+              <span style="font-size:.75rem;color:var(--sde-muted)">
+                Conseil du ${a.date_conseil || new Date().toISOString().slice(0,10)}${qtyTxt}${prixTxt}
+              </span>
+            </div>
+            <p style="margin:0;font-size:.83rem;color:var(--sde-text)">${a.raisonnement || ""}</p>
+          </div>`;
+
+        loadHistory(data.history, data.stats);
+      })
+      .catch(() => { wrap.innerHTML = `<p class="text-danger small">Erreur conseil.</p>`; });
+  }
+
+  /* ── Historique conseils ── */
+  function loadHistory(history, stats) {
+    const wrap = document.getElementById("sde-advice-history-wrap");
+    if (!history || history.length <= 1) { wrap.innerHTML = ""; return; }
+
+    const statsHtml = stats && stats.total > 0 ? `
+      <span style="font-size:.75rem;color:var(--sde-muted)">
+        Fiabilité sur ${stats.total} conseils évalués :
+        <strong style="color:${stats.taux_pct >= 60 ? "#1D9E75" : "#D85A30"}">${stats.taux_pct}%</strong>
+        (${stats.bons} bons · ${stats.mauvais} mauvais)
+      </span>` : "";
+
+    const rows = history.slice(1).map(h => {
+      const color = ACTION_COLOR[h.action] || "#5a6a7a";
+      const icon  = ACTION_ICON[h.action]  || "◆";
+      let eval_html = "";
+      if (h.bon_conseil !== null && h.bon_conseil !== undefined) {
+        const ok = h.bon_conseil;
+        eval_html = `<span style="color:${ok ? "#1D9E75" : "#D85A30"};font-size:.75rem">
+          ${ok ? "✓ Bon" : "✗ Mauvais"} · ${h.variation_j1 >= 0 ? "+" : ""}${parseFloat(h.variation_j1).toFixed(2)}%</span>`;
+      } else if (h.prix_j1 == null) {
+        eval_html = `<span style="color:var(--sde-muted);font-size:.75rem">En attente…</span>`;
+      }
+      return `<tr>
+        <td style="font-size:.75rem;color:var(--sde-muted)">${h.date_conseil}</td>
+        <td><span style="color:${color};font-weight:600;font-size:.78rem">${icon} ${h.action}</span></td>
+        <td style="font-size:.75rem;color:var(--sde-muted)">${h.prix_jour ? SYM + parseFloat(h.prix_jour).toFixed(2) : "—"}</td>
+        <td>${eval_html}</td>
+      </tr>`;
+    }).join("");
+
+    wrap.innerHTML = `
+      <details class="mt-2" style="font-size:.82rem">
+        <summary style="cursor:pointer;color:var(--sde-muted);font-size:.78rem;list-style:none">
+          <i class="bi bi-clock-history me-1"></i>Historique des conseils ${statsHtml}
+        </summary>
+        <div class="table-responsive mt-2">
+          <table class="table table-sm" style="font-size:.78rem">
+            <thead><tr>
+              <th style="color:var(--sde-muted);font-weight:500">Date</th>
+              <th style="color:var(--sde-muted);font-weight:500">Conseil</th>
+              <th style="color:var(--sde-muted);font-weight:500">Prix</th>
+              <th style="color:var(--sde-muted);font-weight:500">Résultat J+1</th>
+            </tr></thead>
+            <tbody>${rows}</tbody>
+          </table>
+        </div>
+      </details>`;
+  }
+
+  /* ── Modal ajout ── */
+  function openAddModal() {
+    document.getElementById("sde-pos-date").value  = new Date().toISOString().slice(0,10);
+    document.getElementById("sde-pos-qty").value   = "";
+    document.getElementById("sde-pos-price").value = "";
+    document.getElementById("sde-pos-notes").value = "";
+    document.getElementById("sde-pos-error").classList.add("d-none");
+    new bootstrap.Modal(document.getElementById("sde-position-modal")).show();
+  }
+
+  function submitAdd() {
+    const errEl = document.getElementById("sde-pos-error");
+    const body = {
+      ticker:     TICKER,
+      company:    COMPANY,
+      date_achat: document.getElementById("sde-pos-date").value,
+      quantite:   parseFloat(document.getElementById("sde-pos-qty").value),
+      prix_achat: parseFloat(document.getElementById("sde-pos-price").value),
+      currency:   "USD",
+      notes:      document.getElementById("sde-pos-notes").value,
+    };
+    if (!body.date_achat || isNaN(body.quantite) || isNaN(body.prix_achat)) {
+      errEl.textContent = "Date, quantité et prix sont obligatoires.";
+      errEl.classList.remove("d-none"); return;
+    }
+    fetch("/portfolio/positions/add", {
+      method: "POST",
+      headers: {"Content-Type": "application/json",
+                "X-CSRFToken": document.querySelector('meta[name="csrf-token"]').content},
+      body: JSON.stringify(body),
+    })
+    .then(r => r.json()).then(data => {
+      if (!data.ok) { errEl.textContent = data.error; errEl.classList.remove("d-none"); return; }
+      bootstrap.Modal.getInstance(document.getElementById("sde-position-modal")).hide();
+      loadPositions();
+    })
+    .catch(() => { errEl.textContent = "Erreur réseau."; errEl.classList.remove("d-none"); });
+  }
+
+  function deletePos(id) {
+    if (!confirm("Supprimer ce lot d'achat ?")) return;
+    fetch(`/portfolio/positions/delete/${id}`, {
+      method: "DELETE",
+      headers: {"X-CSRFToken": document.querySelector('meta[name="csrf-token"]').content},
+    })
+    .then(r => r.json()).then(data => { if (data.ok) loadPositions(); });
+  }
+
+  /* ── Init ── */
+  document.addEventListener("DOMContentLoaded", function () {
+    loadPositions();
+    loadAdvice();
+  });
+
+  return { openAddModal, submitAdd, deletePos };
+})();
+{% endif %}
+
+/* ── Graphiques ─────────────────────────────────────────────────────────── */
 document.addEventListener("DOMContentLoaded", function () {
   const overlay = document.getElementById("sde-page-loading");
   if (overlay) overlay.remove();

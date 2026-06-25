@@ -35,12 +35,14 @@ def create_app() -> Flask:
     from flask_app.blueprints.auth import load_user as _load_user
     login_manager.user_loader(_load_user)
 
-    from flask_app.blueprints.auth  import bp as auth_bp
-    from flask_app.blueprints.stock import bp as stock_bp
-    from flask_app.blueprints.cron  import bp as cron_bp
+    from flask_app.blueprints.auth      import bp as auth_bp
+    from flask_app.blueprints.stock     import bp as stock_bp
+    from flask_app.blueprints.cron      import bp as cron_bp
+    from flask_app.blueprints.portfolio import bp as portfolio_bp
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(stock_bp)
+    app.register_blueprint(portfolio_bp)
     csrf.exempt(cron_bp)          # pas de token CSRF — le blueprint a son propre secret
     app.register_blueprint(cron_bp)
 

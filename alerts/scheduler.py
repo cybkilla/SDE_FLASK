@@ -114,6 +114,15 @@ def _check_ticker(ticker: str, company: str, username: str, email: str) -> None:
     # ── 5. Mise à jour du dernier état connu ─────────────
     save_last_score(ticker, new_score, new_reco, prix_live or prix)
 
+    # ── 6. Évaluation du conseil d'hier (J+1) ────────────
+    if prix_live:
+        try:
+            from portfolio.advisor import evaluate_yesterday_advice
+            # Pour chaque utilisateur qui a ce ticker en watchlist
+            evaluate_yesterday_advice(username, ticker, prix_live)
+        except Exception as e:
+            print(f"  [Advisor] evaluate J+1 erreur ({ticker}) : {e}", flush=True)
+
 
 def check_all():
     """Parcourt toutes les watchlists et vérifie chaque ticker."""
