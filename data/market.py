@@ -302,6 +302,34 @@ def _get_finnhub_fallback(ticker: str) -> dict:
 
 
 # ══════════════════════════════════════════════════════════
+# PRIX LIVE — appel léger Finnhub (pour rafraîchir un snapshot)
+# ══════════════════════════════════════════════════════════
+def get_live_price(ticker: str) -> dict:
+    """
+    Retourne uniquement le prix actuel et la variation du jour via Finnhub.
+    Utilisé pour superposer un prix frais sur un snapshot Supabase de quelques heures.
+    Retourne {} si Finnhub indisponible (fallback : le snapshot garde son prix).
+    """
+    try:
+        fh    = _fh()
+        quote = fh.quote(ticker.upper()) or {}
+        price = _safe(quote.get("c"))
+        prev  = _safe(quote.get("pc"))
+        if price and prev and float(prev) > 0:
+            var_1d = round((float(price) - float(prev)) / float(prev) * 100, 2)
+        else:
+            var_1d = 0.0
+        return {
+            "price":      round(float(price), 2) if price else None,
+            "prev_close": round(float(prev),  2) if prev  else None,
+            "var_1d":     var_1d,
+        }
+    except Exception as e:
+        print(f"[Market] get_live_price({ticker}) erreur : {e}", flush=True)
+        return {}
+
+
+# ══════════════════════════════════════════════════════════
 # POINT D'ENTRÉE — essaie yfinance, bascule sur Finnhub+TD
 # ══════════════════════════════════════════════════════════
 def get_market_data(ticker: str) -> dict:

@@ -56,6 +56,20 @@ def analyze(ticker: str):
         flash(f"Erreur lors de l'analyse de {ticker} : {exc}", "danger")
         return redirect(url_for("stock.home"))
 
+    # Méta snapshot : âge en minutes (présent seulement si résultat depuis Supabase)
+    snapshot_age_min = res.pop("_sde_snapshot_age_min", None)
+    snapshot_ts      = res.pop("_sde_snapshot_ts",      None)
+
+    # Prix live : rafraîchit le cours si on sert un snapshot de + de 5 min
+    if snapshot_age_min is not None and snapshot_age_min > 5:
+        try:
+            from data.market import get_live_price
+            live = get_live_price(ticker)
+            if live.get("price"):
+                res["market"].update(live)
+        except Exception:
+            pass
+
     market = res["market"]
     sym    = _CURRENCY_SYM.get(market.get("currency", "USD"), "$")
 
@@ -206,9 +220,11 @@ def analyze(ticker: str):
         signals_list = signals_list,
         news_list    = news_list,
         insider_list = insider_list,
-        charts         = charts,
-        in_watchlist   = in_watchlist,
-        candle_pattern = candle_pattern,
+        charts           = charts,
+        in_watchlist     = in_watchlist,
+        candle_pattern   = candle_pattern,
+        snapshot_age_min = snapshot_age_min,
+        snapshot_ts      = snapshot_ts,
     )
 
 

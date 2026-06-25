@@ -59,6 +59,24 @@
 
 </div>
 
+{% if snapshot_age_min is not none %}
+{# Bandeau discret : l'analyse vient du cache Supabase #}
+{% set snap_h = (snapshot_age_min // 60) %}
+{% set snap_m = (snapshot_age_min % 60) %}
+{% set snap_age_str = snap_h ~ 'h' ~ '%02d'|format(snap_m) if snap_h > 0 else snap_m|string ~ ' min' %}
+<div style="background:#F1F5F9;border-bottom:1px solid var(--sde-border);
+            padding:5px 16px;font-size:.74rem;color:var(--sde-muted);
+            display:flex;align-items:center;gap:8px">
+  <i class="bi bi-database" style="font-size:.72rem"></i>
+  Analyse mise en cache il y a {{ snap_age_str }} · Prix actualisé en direct
+  <a href="{{ url_for('stock.analyze', ticker=ticker) }}?nocache=1"
+     data-sde-loading="Analyse de {{ ticker }}…"
+     style="color:var(--sde-teal);font-weight:500;margin-left:4px">
+    Rafraîchir
+  </a>
+</div>
+{% endif %}
+
 <!-- ══ MÉTRIQUES LIVE ════════════════════════════════════════════════════════ -->
 {% set var  = market.var_1d if market.var_1d is not none else 0.0 %}
 {% set cvar = '#1D9E75' if var >= 0 else '#D85A30' %}
