@@ -38,6 +38,21 @@ def _df_to_records(df) -> list:
     return [{k: _v(v) for k, v in row.items()} for row in records]
 
 
+def _clean(obj):
+    """Convertit récursivement n'importe quel objet en JSON-safe.
+    Gère les DataFrames et Series imbriqués dans des dicts (ex: executive_risk["detail"]).
+    """
+    if isinstance(obj, pd.DataFrame):
+        return _df_to_records(obj)
+    if isinstance(obj, pd.Series):
+        return {str(i): _v(x) for i, x in obj.items()}
+    if isinstance(obj, dict):
+        return {k: _clean(v) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [_clean(x) for x in obj]
+    return _v(obj)
+
+
 def _serialize(result: dict) -> dict:
     """Transforme le dict pipeline en JSON pur stockable dans Supabase."""
     out = {}
@@ -48,27 +63,8 @@ def _serialize(result: dict) -> dict:
             m = {k: _v(v) for k, v in val.items() if k != "history"}
             m["history"] = _df_to_records(val.get("history"))
             out["market"] = m
-        elif key == "sentiment":
-            s = {}
-            for k, v in val.items():
-                if isinstance(v, pd.DataFrame):
-                    s[k] = _df_to_records(v)
-                elif isinstance(v, pd.Series):
-                    s[k] = {str(i): _v(x) for i, x in v.items()}
-                else:
-                    s[k] = _v(v)
-            out["sentiment"] = s
-        elif isinstance(val, pd.DataFrame):
-            out[key] = _df_to_records(val)
-        elif isinstance(val, dict):
-            out[key] = {k: _v(v) for k, v in val.items()}
-        elif isinstance(val, list):
-            out[key] = [
-                {k: _v(v) for k, v in x.items()} if isinstance(x, dict) else _v(x)
-                for x in val
-            ]
         else:
-            out[key] = _v(val)
+            out[key] = _clean(val)
     return out
 
 
