@@ -88,6 +88,7 @@ def _get_yfinance(ticker: str) -> dict:
         raise ValueError(f"Ticker '{ticker}' : aucune clôture disponible.")
 
     hist = _build_ret_vol(hist)
+    hist = hist.tail(45)   # indicateurs calculés sur 75j, on garde 45 lignes en mémoire
     last = hist.iloc[-1]
     _ind = _ind_fn(last, 0)
 
@@ -222,6 +223,7 @@ def _get_finnhub_fallback(ticker: str) -> dict:
         raise ValueError(f"Ticker '{ticker}' : aucune clôture disponible.")
 
     hist = _build_ret_vol(hist)
+    hist = hist.tail(45)   # indicateurs calculés sur 75j, on garde 45 lignes en mémoire
     last = hist.iloc[-1]
 
     # Quote temps réel
