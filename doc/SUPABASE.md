@@ -1,8 +1,6 @@
 # SDE — Configuration Supabase
 
-Supabase remplace MongoDB Atlas comme backend de persistance.  
-Il expose une API REST sur HTTPS (port 443), ce qui évite les problèmes TLS
-rencontrés avec pymongo sur Render.
+Supabase est le backend de persistance principal. Il expose une API REST sur HTTPS (port 443), compatible avec Render et tout environnement cloud.
 
 ---
 
@@ -19,6 +17,7 @@ rencontrés avec pymongo sur Render.
 **SQL Editor → New query** — exécuter une seule fois :
 
 ```sql
+-- Comptes utilisateurs
 CREATE TABLE users (
   username TEXT PRIMARY KEY,
   name     TEXT NOT NULL,
@@ -26,6 +25,7 @@ CREATE TABLE users (
   password TEXT NOT NULL
 );
 
+-- Tickers suivis par utilisateur
 CREATE TABLE watchlist (
   id       SERIAL PRIMARY KEY,
   username TEXT NOT NULL,
@@ -35,6 +35,7 @@ CREATE TABLE watchlist (
   UNIQUE(username, ticker)
 );
 
+-- Dernier score/reco connu par ticker (scheduler)
 CREATE TABLE scores (
   ticker  TEXT PRIMARY KEY,
   score   FLOAT,
@@ -42,7 +43,65 @@ CREATE TABLE scores (
   updated TEXT,
   prix    FLOAT
 );
+
+-- Cache pipeline sérialisé (TTL 24h)
+CREATE TABLE ticker_snapshots (
+  ticker     TEXT PRIMARY KEY,
+  payload    JSONB NOT NULL,
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+-- Lots d'achat par utilisateur (supporte le DCA)
+CREATE TABLE positions (
+  id         SERIAL PRIMARY KEY,
+  username   TEXT NOT NULL,
+  ticker     TEXT NOT NULL,
+  company    TEXT DEFAULT '',
+  date_achat DATE NOT NULL,
+  prix_achat FLOAT NOT NULL,
+  quantite   FLOAT NOT NULL,
+  currency   TEXT DEFAULT 'USD',
+  notes      TEXT DEFAULT '',
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+-- Conseils journaliers + évaluation J+1
+CREATE TABLE daily_advice (
+  id                SERIAL PRIMARY KEY,
+  username          TEXT NOT NULL,
+  ticker            TEXT NOT NULL,
+  date_conseil      DATE NOT NULL,
+  action            TEXT NOT NULL,        -- ACHETER / RENFORCER / TENIR / SURVEILLER / ALLÉGER / VENDRE
+  quantite_suggeree FLOAT,
+  prix_jour         FLOAT,
+  prix_cible        FLOAT,
+  score_sde         FLOAT,
+  recommandation    TEXT,
+  raisonnement      TEXT,
+  prix_j1           FLOAT,               -- prix le lendemain (évaluation scheduler)
+  variation_j1      FLOAT,               -- variation % entre prix_jour et prix_j1
+  bon_conseil       BOOLEAN,             -- TRUE si le conseil était pertinent
+  evaluated_at      TIMESTAMPTZ,
+  UNIQUE(username, ticker, date_conseil)
+);
 ```
+
+---
+
+## Activer RLS (Row Level Security)
+
+RLS doit être activé sur **toutes les tables**. L'app utilise la `service_role` key côté serveur, qui bypasse RLS — l'activation empêche tout accès direct non autorisé via la clé anon.
+
+```sql
+ALTER TABLE users           ENABLE ROW LEVEL SECURITY;
+ALTER TABLE watchlist       ENABLE ROW LEVEL SECURITY;
+ALTER TABLE scores          ENABLE ROW LEVEL SECURITY;
+ALTER TABLE ticker_snapshots ENABLE ROW LEVEL SECURITY;
+ALTER TABLE positions       ENABLE ROW LEVEL SECURITY;
+ALTER TABLE daily_advice    ENABLE ROW LEVEL SECURITY;
+```
+
+Aucune policy supplémentaire n'est nécessaire : l'app accède toujours via `service_role` (bypass RLS).
 
 ---
 
@@ -50,13 +109,14 @@ CREATE TABLE scores (
 
 **Project Settings → API** :
 
-| Variable | Source Supabase |
-|---|---|
-| `SUPABASE_URL` | Project URL |
-| `SUPABASE_KEY` | `anon` / `public` key |
-| `SUPABASE_SERVICE_KEY` | `service_role` key (migration uniquement) |
+| Variable | Source Supabase | Usage |
+|---|---|---|
+| `SUPABASE_URL` | Project URL | Toutes les requêtes |
+| `SUPABASE_SERVICE_KEY` | `service_role` key | **Production** — bypass RLS, server-side uniquement |
+| `SUPABASE_KEY` | `anon` / `public` key | Fallback dev local si SERVICE_KEY absent |
 
-> La `service_role` key bypasse le Row Level Security — ne jamais l'exposer côté client ni dans l'app Flask. Elle sert uniquement au script de migration en local.
+> `SUPABASE_SERVICE_KEY` est la clé principale utilisée par l'app en production.  
+> Ne jamais l'exposer côté client ni dans le code source.
 
 ---
 
@@ -65,77 +125,65 @@ CREATE TABLE scores (
 ### Local (`.env`)
 ```env
 SUPABASE_URL=https://xxxxx.supabase.co
-SUPABASE_KEY=eyJhbGci...
-# Pour la migration uniquement :
-SUPABASE_SERVICE_KEY=eyJhbGci...
+SUPABASE_SERVICE_KEY=eyJhbGci...   # service_role — obligatoire
+SUPABASE_KEY=eyJhbGci...           # anon — fallback optionnel
 ```
 
 ### Render (Production)
 Render → Service → **Environment** → ajouter :
 - `SUPABASE_URL`
-- `SUPABASE_KEY`
-
-(`SUPABASE_SERVICE_KEY` n'est pas nécessaire sur Render)
-
----
-
-## Migration des données locales
-
-Importe `auth/users.yaml`, `watchlist/watchlist.json` et `watchlist/last_scores.json`
-dans Supabase. Idempotent : les entrées existantes sont ignorées.
-
-```bash
-# Renseigner SUPABASE_URL, SUPABASE_KEY et SUPABASE_SERVICE_KEY dans .env
-python migrate_to_supabase.py
-```
-
-Sortie attendue :
-```
-✓  Connecté à Supabase : https://xxxxx.supabase.co
-
-── Utilisateurs (4 trouvés) ────────────────────────
-   ✓  admin (Admin)
-   ✓  cyb1 (vladimir.andriana)
-   ✓  cybkilla (Vlad Andriana)
-   ✓  vlad (Vlad)
-   → 4 importé(s), 0 ignoré(s)
-
-── Watchlists (4 entrée(s) pour 2 user(s)) ──
-   ✓  admin/GOOG
-   ✓  admin/TMC
-   ...
-   → 4 importé(s), 0 ignoré(s)
-
-── Scores (4 ticker(s)) ────────────────────────────
-   ✓  GOOG — score 66.1 (ACHETER)
-   ...
-   → 4 importé(s), 0 ignoré(s)
-
-Migration terminée ✓
-```
+- `SUPABASE_SERVICE_KEY`
 
 ---
 
 ## Architecture de la couche DB (`db.py`)
 
-`db.py` expose une interface générique utilisée par `auth.py` et `watchlist/watchlist.py` :
+`db.py` expose une interface générique utilisée par tous les modules :
 
 | Fonction | Description |
 |---|---|
-| `is_available()` | Retourne `True` si Supabase est configuré |
-| `find_one(table, filter)` | Équivalent SELECT … LIMIT 1 |
-| `find(table, filter)` | Équivalent SELECT … |
-| `insert_one(table, doc)` | Équivalent INSERT |
-| `update_one(table, filter, update, upsert)` | Équivalent UPDATE ou UPSERT |
-| `delete_one(table, filter)` | Équivalent DELETE |
-| `count_documents(table, filter)` | Équivalent COUNT |
+| `is_available()` | `True` si Supabase est configuré |
+| `find_one(table, filter)` | SELECT … LIMIT 1 |
+| `find(table, filter)` | SELECT … |
+| `insert_one(table, doc)` | INSERT |
+| `update_one(table, filter, update, upsert)` | UPDATE ou UPSERT |
+| `delete_one(table, filter)` | DELETE |
+| `count_documents(table, filter)` | COUNT |
 
-Si `SUPABASE_URL` ou `SUPABASE_KEY` est absent, toutes les fonctions retournent `None` / `[]` / `0`
-et le code appelant bascule automatiquement sur le fallback YAML/JSON local.
+`db.py` utilise `SUPABASE_SERVICE_KEY` en priorité (bypass RLS).  
+Si absent, bascule sur `SUPABASE_KEY` (anon).  
+Si les deux sont absents, toutes les fonctions retournent `None` / `[]` / `0`.
 
 ---
 
-## Fallback local (sans Supabase)
+## Cache snapshot (`snapshot.py`)
+
+Le module `snapshot.py` sérialise le résultat complet du pipeline dans `ticker_snapshots` :
+
+- **TTL** : 24h (configurable via `MAX_AGE_HOURS`)
+- **Sérialisation** : DataFrames → listes de dicts, numpy → scalaires Python natifs
+- **Désérialisation** : reconstruction des DataFrames avec DatetimeIndex
+
+Flux d'une requête d'analyse :
+```
+1. Cache mémoire (15 min)       → hit → réponse immédiate
+2. ticker_snapshots (< 24h)     → hit → prix superposé via get_live_price()
+3. Pipeline complet              → calcul → sauvegardé en mémoire + Supabase
+```
+
+---
+
+## Migration des données locales
+
+Script one-shot pour importer `auth/users.yaml`, `watchlist/watchlist.json` et `watchlist/last_scores.json` dans Supabase. Idempotent.
+
+```bash
+python migrate_to_supabase.py
+```
+
+---
+
+## Fallback local (dev sans Supabase)
 
 | Données | Fichier local |
 |---|---|
@@ -144,4 +192,3 @@ et le code appelant bascule automatiquement sur le fallback YAML/JSON local.
 | Scores | `watchlist/last_scores.json` |
 
 Le fallback est actif automatiquement quand les variables Supabase sont absentes du `.env`.
-Utile pour le développement local sans connexion internet ou sans compte Supabase.
