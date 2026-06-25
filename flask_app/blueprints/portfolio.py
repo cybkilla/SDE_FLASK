@@ -112,29 +112,41 @@ def get_overview():
         result = []
         for ticker in tickers:
             try:
-                live    = get_live_price(ticker)
-                price   = live.get("price") or 0
-                var_1d  = live.get("var_1d") or 0
-                summary = get_portfolio_summary(current_user.id, ticker, price)
-                if not summary:
+                live         = get_live_price(ticker)
+                price        = live.get("price") or 0
+                var_1d       = live.get("var_1d") or 0
+                ticker_lots  = [l for l in all_lots if l["ticker"] == ticker]
+                if not ticker_lots:
                     continue
-                currency = summary.get("currency", "USD")
-                company  = next(
-                    (l["company"] for l in all_lots
-                     if l["ticker"] == ticker and l.get("company")),
-                    ticker,
+
+                # Calcul summary directement depuis les lots déjà chargés (0 appel DB extra)
+                total_shares  = sum(float(l["quantite"]) for l in ticker_lots)
+                total_investi = sum(float(l["quantite"]) * float(l["prix_achat"]) for l in ticker_lots)
+                cout_moyen    = total_investi / total_shares if total_shares else 0
+                valeur        = total_shares * price
+                pnl_euros     = valeur - total_investi
+                pnl_pct       = (pnl_euros / total_investi * 100) if total_investi else 0
+                currency      = ticker_lots[0].get("currency", "USD")
+                company       = next(
+                    (l["company"] for l in ticker_lots if l.get("company")), ticker
                 )
-                # Exclure les lots du résumé (détail non nécessaire ici)
-                s = {k: v for k, v in summary.items() if k != "lots"}
                 result.append({
-                    "ticker":   ticker,
-                    "company":  company,
+                    "ticker":  ticker,
+                    "company": company,
                     "currency": currency,
-                    "sym":      _SYM.get(currency, "$"),
-                    "price":    price,
-                    "var_1d":   var_1d,
-                    "summary":  s,
-                    "advice":   advices.get(ticker),
+                    "sym":     _SYM.get(currency, "$"),
+                    "price":   price,
+                    "var_1d":  var_1d,
+                    "summary": {
+                        "lots":             ticker_lots,
+                        "total_shares":     round(total_shares,  4),
+                        "cout_moyen":       round(cout_moyen,    4),
+                        "total_investi":    round(total_investi, 2),
+                        "valeur_actuelle":  round(valeur,        2),
+                        "pnl_euros":        round(pnl_euros,     2),
+                        "pnl_pct":          round(pnl_pct,       2),
+                    },
+                    "advice":  advices.get(ticker),
                 })
             except Exception as e:
                 print(f"[Overview] {ticker} erreur : {e}", flush=True)

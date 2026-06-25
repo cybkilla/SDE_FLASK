@@ -31,6 +31,46 @@
   SDE est un outil d'aide à la décision. Ces informations ne constituent pas un conseil financier.
 </p>
 
+<!-- Modal ajout position (partagé, ticker dynamique) -->
+<div class="modal fade" id="sde-position-modal" tabindex="-1">
+  <div class="modal-dialog modal-sm">
+    <div class="modal-content" style="border-radius:12px">
+      <div class="modal-header py-2 px-3" style="border-bottom:1px solid var(--sde-border)">
+        <h6 class="modal-title fw-semibold" style="font-size:.85rem">
+          <i class="bi bi-plus-circle me-1 text-success"></i>
+          Enregistrer un achat — <span id="sde-modal-ticker-label"></span>
+        </h6>
+        <button type="button" class="btn-close btn-sm" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body px-3 py-3">
+        <div class="mb-2">
+          <label class="form-label small fw-semibold">Date d'achat</label>
+          <input type="date" id="sde-pos-date" class="form-control form-control-sm">
+        </div>
+        <div class="mb-2">
+          <label class="form-label small fw-semibold">Quantité (actions)</label>
+          <input type="number" id="sde-pos-qty" class="form-control form-control-sm"
+                 placeholder="ex : 100" min="0.0001" step="any">
+        </div>
+        <div class="mb-3">
+          <label class="form-label small fw-semibold">Prix d'achat</label>
+          <input type="number" id="sde-pos-price" class="form-control form-control-sm"
+                 placeholder="ex : 1.85" min="0.0001" step="any">
+        </div>
+        <div class="mb-3">
+          <label class="form-label small fw-semibold">Notes (optionnel)</label>
+          <input type="text" id="sde-pos-notes" class="form-control form-control-sm"
+                 placeholder="ex : DCA Mars 2025">
+        </div>
+        <div id="sde-pos-error" class="text-danger small mb-2 d-none"></div>
+        <button class="btn btn-sde-teal btn-sm w-100" onclick="submitAdd()">
+          <i class="bi bi-check-circle me-1"></i>Enregistrer
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
 {% endblock %}
 
 {% block scripts %}
@@ -48,18 +88,18 @@
     SURVEILLER: "◎", "ALLÉGER": "↘", VENDRE: "↓",
   };
 
+  // Ticker actif pour le modal
+  let _modalTicker = "", _modalCompany = "", _modalCurrency = "USD";
+
   function _pct(v) {
     const n = parseFloat(v);
     return (n >= 0 ? "+" : "") + n.toFixed(2) + "%";
-  }
-  function _money(sym, v) {
-    return sym + Math.abs(parseFloat(v)).toFixed(2);
   }
   function _dateFr(iso) {
     return new Date(iso + "T00:00:00").toLocaleDateString("fr-FR", { day: "numeric", month: "long" });
   }
 
-  /* ── Rendu du bloc conseil pour un ticker ── */
+  /* ── Bloc conseil ── */
   function adviceHtml(ticker, sym, a) {
     if (!a) {
       return `<div id="advice-wrap-${ticker}"
@@ -96,20 +136,56 @@
     </div>`;
   }
 
-  /* ── Rendu d'une carte ticker ── */
+  /* ── Bloc lots ── */
+  function lotsHtml(ticker, sym, lots, company, currency) {
+    const rows = lots.map(l => {
+      const d = new Date(l.date_achat + "T00:00:00");
+      const dateFr = d.toLocaleDateString("fr-FR", { day: "2-digit", month: "short", year: "numeric" });
+      return `<div style="display:flex;align-items:center;justify-content:space-between;
+                          padding:6px 0;border-bottom:1px solid var(--sde-border)">
+        <div style="display:flex;align-items:center;gap:8px">
+          <span style="width:6px;height:6px;border-radius:50%;background:var(--sde-muted);flex-shrink:0"></span>
+          <span style="font-size:.78rem;color:var(--sde-muted)">${dateFr}</span>
+          <span style="font-size:.8rem">
+            <strong>${parseFloat(l.quantite).toLocaleString("en-US", {maximumFractionDigits:4})}</strong>
+            actions @ ${sym}${parseFloat(l.prix_achat).toFixed(4)}
+          </span>
+        </div>
+        <button onclick="deletePos(${l.id}, '${ticker}')"
+                style="background:none;border:none;color:var(--sde-muted);cursor:pointer;
+                       padding:2px 6px;font-size:.85rem" title="Supprimer ce lot">🗑</button>
+      </div>`;
+    }).join("");
+
+    return `<details id="lots-wrap-${ticker}" style="margin-top:10px;border-top:1px solid var(--sde-border);padding-top:10px">
+      <summary style="cursor:pointer;font-size:.78rem;color:var(--sde-muted);
+                      list-style:none;display:flex;align-items:center;gap:6px;user-select:none">
+        <i class="bi bi-list-ul"></i>
+        ${lots.length} lot${lots.length > 1 ? "s" : ""} d'achat
+        <button onclick="event.preventDefault();openAddModal('${ticker}','${company.replace(/'/g,"\\'")}','${currency}')"
+                style="margin-left:auto;background:none;border:1px solid var(--sde-border);
+                       border-radius:6px;padding:2px 10px;font-size:.72rem;
+                       color:var(--sde-teal);cursor:pointer;font-weight:500">
+          <i class="bi bi-plus me-1"></i>Ajouter
+        </button>
+      </summary>
+      <div style="margin-top:6px">${rows}</div>
+    </details>`;
+  }
+
+  /* ── Carte ticker ── */
   function renderCard(pos) {
-    const { ticker, company, sym, price, var_1d, summary: s, advice: a } = pos;
-    const pColor = var_1d >= 0 ? "#1D9E75" : "#D85A30";
-    const arr    = var_1d >= 0 ? "▲" : "▼";
+    const { ticker, company, sym, price, var_1d, summary: s, advice: a, currency } = pos;
+    const pColor  = var_1d >= 0 ? "#1D9E75" : "#D85A30";
+    const arr     = var_1d >= 0 ? "▲" : "▼";
     const pColor2 = s.pnl_pct >= 0 ? "#1D9E75" : "#D85A30";
     const pSign   = s.pnl_euros >= 0 ? "+" : "−";
 
     return `
-<div class="sde-card mb-3" id="card-${ticker}">
+<div class="sde-card mb-3" id="card-${ticker}" data-sym="${sym}" data-currency="${currency}">
 
   <!-- En-tête ticker + prix -->
-  <div style="display:flex;align-items:flex-start;justify-content:space-between;
-              gap:8px;margin-bottom:12px">
+  <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:12px">
     <div>
       <a href="/analyze/${ticker}" data-sde-loading="Analyse de ${ticker}…"
          style="font-weight:700;font-size:1rem;color:var(--sde-navy)">${ticker}</a>
@@ -133,14 +209,11 @@
       <strong style="color:var(--sde-text)">
         ${parseFloat(s.total_shares).toLocaleString("en-US", {maximumFractionDigits:4})}
       </strong> actions
-      &nbsp;·&nbsp; coût moy.
-      <strong style="color:var(--sde-text)">${sym}${parseFloat(s.cout_moyen).toFixed(2)}</strong>
-      &nbsp;·&nbsp; investi
-      <strong style="color:var(--sde-text)">${sym}${parseFloat(s.total_investi).toFixed(2)}</strong>
+      &nbsp;·&nbsp; coût moy. <strong style="color:var(--sde-text)">${sym}${parseFloat(s.cout_moyen).toFixed(2)}</strong>
+      &nbsp;·&nbsp; investi <strong style="color:var(--sde-text)">${sym}${parseFloat(s.total_investi).toFixed(2)}</strong>
     </span>
     <span style="color:${pColor2};font-weight:600;margin-left:auto">
-      ${_pct(s.pnl_pct)}
-      &nbsp;·&nbsp; ${pSign}${_money(sym, s.pnl_euros)}
+      ${_pct(s.pnl_pct)} &nbsp;·&nbsp; ${pSign}${sym}${Math.abs(parseFloat(s.pnl_euros)).toFixed(2)}
     </span>
     <a href="/analyze/${ticker}" data-sde-loading="Analyse de ${ticker}…"
        style="font-size:.78rem;color:var(--sde-teal);flex-shrink:0">
@@ -148,10 +221,13 @@
     </a>
   </div>
 
+  <!-- Lots détaillés + bouton Ajouter -->
+  ${lotsHtml(ticker, sym, s.lots || [], company, currency || "USD")}
+
 </div>`;
   }
 
-  /* ── Chargement de la vue d'ensemble ── */
+  /* ── Chargement overview ── */
   function loadOverview() {
     const wrap = document.getElementById("sde-overview-wrap");
     wrap.innerHTML = `<div class="text-center py-5">
@@ -181,40 +257,34 @@
       });
   }
 
-  /* ── Régénération du conseil pour un ticker ── */
+  /* ── Régénération conseil ── */
   function refreshAdvice(ticker) {
     const wrap = document.getElementById("advice-wrap-" + ticker);
     if (!wrap) return;
+    const card = document.getElementById("card-" + ticker);
+    const sym  = card ? card.dataset.sym : "$";
     wrap.style.background = "#F1F5F9";
     wrap.innerHTML = `<p class="text-muted" style="font-size:.8rem;padding:4px 0">
       <span class="spinner-border spinner-border-sm me-1"></span>Régénération…</p>`;
-
     fetch("/portfolio/advice/" + ticker + "/reset", {
-      method: "POST",
-      headers: { "X-CSRFToken": CSRF },
+      method: "POST", headers: { "X-CSRFToken": CSRF },
     })
     .then(() => fetch("/portfolio/advice/" + ticker))
     .then(r => r.json())
     .then(data => {
-      // Récupérer sym depuis la carte parente
-      const card = document.getElementById("card-" + ticker);
-      const symEl = card ? card.querySelector("[data-sym]") : null;
-      const sym = symEl ? symEl.dataset.sym : "$";
       if (!data.ok || !data.advice) {
         wrap.style.background = "#F1F5F9";
         wrap.innerHTML = `<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
           <i class="bi bi-info-circle" style="color:var(--sde-muted)"></i>
           <span style="font-size:.8rem;color:var(--sde-muted)">Conseil non disponible —</span>
           <a href="/analyze/${ticker}" style="font-size:.8rem;font-weight:500">Analyser d'abord →</a>
-        </div>`;
-        return;
+        </div>`; return;
       }
       const a = data.advice;
       const color = ACTION_COLOR[a.action] || "#5a6a7a";
       const icon  = ACTION_ICON[a.action]  || "◆";
       const qty   = a.quantite_suggeree
-        ? ` <span style="font-weight:400;font-size:.76rem">· ${parseFloat(a.quantite_suggeree).toLocaleString("en-US", {maximumFractionDigits:4})} actions</span>`
-        : "";
+        ? ` <span style="font-weight:400;font-size:.76rem">· ${parseFloat(a.quantite_suggeree).toLocaleString("en-US",{maximumFractionDigits:4})} actions</span>` : "";
       wrap.style.background = color + "13";
       wrap.innerHTML = `
         <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px">
@@ -223,20 +293,74 @@
           <span style="font-size:.72rem;color:var(--sde-muted)">${_dateFr(a.date_conseil || new Date().toISOString().slice(0,10))}</span>
           <button onclick="refreshAdvice('${ticker}')"
                   style="margin-left:auto;background:none;border:1px solid var(--sde-border);
-                         border-radius:6px;padding:2px 8px;font-size:.72rem;
-                         color:var(--sde-muted);cursor:pointer">
+                         border-radius:6px;padding:2px 8px;font-size:.72rem;color:var(--sde-muted);cursor:pointer">
             <i class="bi bi-arrow-clockwise"></i>
           </button>
         </div>
         <p style="margin:0;font-size:.8rem;color:var(--sde-text);line-height:1.6">${a.raisonnement || ""}</p>`;
     })
-    .catch(() => {
-      wrap.innerHTML = `<p class="text-danger small" style="padding:4px 0">Erreur régénération.</p>`;
-    });
+    .catch(() => { wrap.innerHTML = `<p class="text-danger small" style="padding:4px 0">Erreur.</p>`; });
   }
 
-  window.loadOverview    = loadOverview;
-  window.refreshAdvice   = refreshAdvice;
+  /* ── Modal ajout ── */
+  function openAddModal(ticker, company, currency) {
+    _modalTicker   = ticker;
+    _modalCompany  = company;
+    _modalCurrency = currency || "USD";
+    document.getElementById("sde-modal-ticker-label").textContent = ticker;
+    document.getElementById("sde-pos-date").value  = new Date().toISOString().slice(0, 10);
+    document.getElementById("sde-pos-qty").value   = "";
+    document.getElementById("sde-pos-price").value = "";
+    document.getElementById("sde-pos-notes").value = "";
+    document.getElementById("sde-pos-error").classList.add("d-none");
+    new bootstrap.Modal(document.getElementById("sde-position-modal")).show();
+  }
+
+  function submitAdd() {
+    const errEl = document.getElementById("sde-pos-error");
+    const body  = {
+      ticker:     _modalTicker,
+      company:    _modalCompany,
+      date_achat: document.getElementById("sde-pos-date").value,
+      quantite:   parseFloat(document.getElementById("sde-pos-qty").value),
+      prix_achat: parseFloat(document.getElementById("sde-pos-price").value),
+      currency:   _modalCurrency,
+      notes:      document.getElementById("sde-pos-notes").value,
+    };
+    if (!body.date_achat || isNaN(body.quantite) || isNaN(body.prix_achat)) {
+      errEl.textContent = "Date, quantité et prix sont obligatoires.";
+      errEl.classList.remove("d-none"); return;
+    }
+    fetch("/portfolio/positions/add", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-CSRFToken": CSRF },
+      body: JSON.stringify(body),
+    })
+    .then(r => r.json())
+    .then(data => {
+      if (!data.ok) { errEl.textContent = data.error; errEl.classList.remove("d-none"); return; }
+      bootstrap.Modal.getInstance(document.getElementById("sde-position-modal")).hide();
+      loadOverview();
+    })
+    .catch(() => { errEl.textContent = "Erreur réseau."; errEl.classList.remove("d-none"); });
+  }
+
+  /* ── Suppression d'un lot ── */
+  function deletePos(id, ticker) {
+    if (!confirm("Supprimer ce lot d'achat ?")) return;
+    fetch("/portfolio/positions/delete/" + id, {
+      method: "DELETE",
+      headers: { "X-CSRFToken": CSRF },
+    })
+    .then(r => r.json())
+    .then(data => { if (data.ok) loadOverview(); });
+  }
+
+  window.loadOverview  = loadOverview;
+  window.refreshAdvice = refreshAdvice;
+  window.openAddModal  = openAddModal;
+  window.submitAdd     = submitAdd;
+  window.deletePos     = deletePos;
 
   document.addEventListener("DOMContentLoaded", loadOverview);
 })();
