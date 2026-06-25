@@ -791,8 +791,11 @@ window.sdePortfolio = (function () {
                 <span style="color:var(--sde-muted)">Coût moy.</span>
                 <strong> ${SYM}${parseFloat(s.cout_moyen).toFixed(4)}</strong>
               </span>
-              <span style="color:var(--sde-muted)">
-                ${parseFloat(s.total_shares).toLocaleString('en-US', {maximumFractionDigits:4})} actions
+              <span>
+                <strong style="font-size:.95rem;color:var(--sde-navy)">
+                  ${parseFloat(s.total_shares).toLocaleString('en-US', {maximumFractionDigits:4})}
+                </strong>
+                <span style="color:var(--sde-muted);font-size:.78rem"> actions</span>
               </span>
             </div>
             <div style="font-size:.85rem;font-weight:700;color:${pnlColor}">
