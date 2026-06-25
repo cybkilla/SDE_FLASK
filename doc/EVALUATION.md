@@ -1,6 +1,6 @@
 # SDE — Grille d'évaluation PPL 2026
 
-> Récap technique par critère. 
+> Récap technique par critère — version Flask (refonte depuis Streamlit).
 
 ---
 
@@ -8,10 +8,10 @@
 
 | Sous-critère | Ce qui est fait dans SDE |
 |---|---|
-| **Ambition & Originalité** | Moteur d'analyse boursière multi-source : scoring composite technique + fondamental + sentiment + risque dirigeants + LLM, avec système d'alertes email automatisées. |
-| **Fonctionnalités** | Recherche de ticker, analyse complète, watchlist multi-utilisateurs, alertes email conditionnelles, explication IA générée. |
-| **Description des processus** | `pipeline.py::run(ticker)` orchestre la collecte → calcul des sous-scores → score global → recommandation → explication LLM. |
-| **Modélisation du Workflow** | Voir `ARCHITECTURE.md` : 5 modules d'analyse indépendants agrégés par `scoring.py`, résultat consommé par `app.py` et `scheduler.py`. |
+| **Ambition & Originalité** | Moteur d'analyse boursière multi-source : scoring composite technique + fondamental + sentiment NLP + risque dirigeants + LLM. Gestion de portefeuille avec conseil journalier personnalisé et évaluation automatique de la pertinence (bon/mauvais conseil) via yfinance J+1. |
+| **Fonctionnalités** | Recherche de ticker, analyse complète, watchlist multi-utilisateurs, positions (achat + vente), P&L réalisé/latent, conseil quotidien immutable, dashboard admin KPIs, alertes email automatisées. |
+| **Description des processus** | `pipeline.py::run(ticker)` orchestre : collecte marché → sous-scores (technique/fondamental/médiatique) → score global → recommandation → explication LLM → conseil position. |
+| **Modélisation du Workflow** | 5 modules d'analyse indépendants agrégés par `scoring.py`. `evaluator.py` évalue en batch les conseils passés. `scheduler.py` deux vitesses (30 min live / 24h pipeline). |
 
 ---
 
@@ -19,11 +19,11 @@
 
 | Sous-critère | Ce qui est fait dans SDE |
 |---|---|
-| **Architecture** | Découpage MVC-like : `data/` (collecte), `analysis/` (calcul), `ui/` (rendu), `alerts/` (notifications), `auth/` (session), `utils/` (helpers). |
-| **Modules externes** | `yfinance`, `newsapi-python`, `feedparser`, `vaderSentiment`, `groq`, `streamlit-authenticator`, `plotly`. |
-| **Système de classes** | `ui/gauge.py` et `ui/charts.py` : figures Plotly encapsulées. `auth/auth.py` : wrapper `streamlit-authenticator`. |
-| **Gestion des données** | Données temps réel via yfinance/NewsAPI ; état persistant en JSON (`watchlist.json`, `last_scores.json`) ; config centralisée dans `config.py`. |
-| **Local / Serveur** | Dev local (Streamlit), scheduler cloud via **GitHub Actions** (cron horaire, commit automatique de `last_scores.json`). |
+| **Architecture** | Flask Blueprints : `auth`, `stock`, `portfolio`, `admin`, `cron`. Séparation nette données (`data/`), analyse (`analysis/`), portfolio (`portfolio/`), rendu (`flask_app/templates/`), alertes (`alerts/`). |
+| **Modules externes** | `yfinance`, `finnhub-python`, `twelvedata`, `newsapi-python`, `feedparser`, `vaderSentiment`, `groq`, `plotly`, `matplotlib`, `supabase`, `flask-login`, `flask-wtf`. |
+| **Système de classes** | `ui/charts.py` : figures Plotly encapsulées. `db.py` : interface générique Supabase. `snapshot.py` : sérialisation/désérialisation DataFrames. `evaluator.py` : batch évaluation conseils. |
+| **Gestion des données** | Données temps réel via yfinance/Finnhub/NewsAPI. Persistance PostgreSQL via Supabase REST. Cache mémoire 15 min + cache snapshot 24h. Fallback fichiers JSON si Supabase absent. |
+| **Local / Serveur** | Dev local (`python run_flask.py`), production Render (gunicorn `workers=1`). Scheduler cron-job.org → `POST /scheduler/run` toutes les 30 min. |
 
 ---
 
@@ -31,12 +31,12 @@
 
 | Sous-critère | Ce qui est fait dans SDE |
 |---|---|
-| **Organisation des fichiers** | Un fichier = une responsabilité (`market.py`, `news.py`, `sentiment.py`, `scoring.py`…). Imports relatifs propres grâce au `sys.path.insert`. |
-| **Fonctions & variables** | Nommage explicite (`get_sector_news`, `save_last_score`, `build_prompt`). Constantes dans `config.py` (`ALERT_VAR_THRESHOLD`, `LLM_MAX_TOKENS`). |
-| **Classes, méthodes, héritage** | Pas de hiérarchie lourde (volontaire) ; classes légères dans `ui/`. Utilisation de dataclasses implicites via dict typés. |
-| **Bibliothèques Standard** | `pathlib`, `json`, `smtplib`, `email.mime`, `sys`, `time`, `os`, `re`, `datetime`. |
-| **Modules Built-In** | `typing` (hints), `functools` (cache), `collections`. |
-| **Organisation & Extensibilité** | `pipeline.py` expose une API unique `run(ticker)` ; ajouter un nouveau sous-score = créer un module + l'intégrer dans `scoring.py` sans toucher à l'UI. |
+| **Organisation des fichiers** | Un fichier = une responsabilité (`market.py`, `news.py`, `sentiment.py`, `scoring.py`, `positions.py`, `advisor.py`, `evaluator.py`). Imports dans les fonctions pour éviter les imports circulaires. |
+| **Fonctions & variables** | Nommage explicite (`get_portfolio_summary`, `evaluate_pending`, `get_global_stats`, `generate_advice`). Constantes dans `config.py`. |
+| **Classes, méthodes, héritage** | Architecture fonctionnelle volontaire (fonctions pures, pas de classes inutiles). Classes légères dans `ui/`. `db.py` encapsule l'accès Supabase. |
+| **Bibliothèques Standard** | `pathlib`, `json`, `os`, `re`, `datetime`, `zoneinfo` (timezone Paris), `threading` (scheduler background), `traceback`. |
+| **Modules Built-In** | `typing` (hints), `functools`, `collections`. |
+| **Organisation & Extensibilité** | `pipeline.py` API unique `run(ticker)`. Ajouter un sous-score = créer un module + l'intégrer dans `scoring.py`. Blueprints Flask isolés et indépendants. |
 
 ---
 
@@ -44,18 +44,18 @@
 
 | Sous-critère | Ce qui est fait dans SDE |
 |---|---|
-| **Justification du design** | `ARCHITECTURE.md` : choix VADER vs FinBERT (GPU optionnel), Groq vs Ollama (fallback local), scoring pondéré 40/35/25. |
-| **Maîtrise du code** | Gestion index Pandas (`_col()` helper pour colonnes absentes), alignement `.fillna()`, fallback LLM gracieux, `variation_tracked` vs `var_1d` yfinance. |
+| **Justification du design** | VADER vs FinBERT (GPU non disponible sur Render). Groq vs Ollama (fallback Python si quota). Scoring pondéré 40/35/25 (technique/fondamental/médiatique). Supabase REST vs SQLAlchemy (compatibilité Render, pas de driver C). `conseil_date` (FK explicite) vs heuristique date+type (trop de faux positifs). |
+| **Maîtrise du code** | Gestion index Pandas (`_col()` helper pour colonnes absentes). P&L en deux passes (réalisé sur lots vendus, latent sur solde restant). `_calcLock` JS pour éviter les boucles événements dans le modal bidir. Bloc/déblocage bouton Vente côté client + validation serveur. |
 
 ---
 
-## 05 Interfaces utilisateur — Streamlit
+## 05 Interfaces utilisateur — Flask / Bootstrap
 
 | Sous-critère | Ce qui est fait dans SDE |
 |---|---|
-| **Librairies** | Streamlit 1.57, `streamlit-authenticator` v0.4.2, Plotly 6, CSS inline custom (ciblage `data-testid`). |
-| **Fonctionnalités** | Login/logout sidebar, recherche de ticker avec autocomplétion, jauge score animée, graphiques OHLCV + RSI + MA, expander actualités par type (ticker/secteur), gestion watchlist. |
-| **Usabilité** | Recommandation colorée (vert/orange/rouge), jauge 0-100, actualités filtrées par type, bouton "Se connecter" aligné à droite dans sidebar. |
+| **Librairies UI** | Flask 3 + Jinja2, Bootstrap 5.3, Bootstrap Icons 1.11, Plotly 2.35 (JS), CSS custom (`sde.css` — Design System "Dashboard Financier"). |
+| **Fonctionnalités UI** | Login/logout, recherche ticker avec autocomplétion AJAX, jauge score, graphiques OHLCV + chandeliers interactifs, watchlist modale, positions avec modal transaction (toggle Achat/Vente, calcul bidir prix×qté↔montant), badge conseil cliquable avec pré-saisie, P&L coloré (vert/rouge), statut marché (Ouvert / Clôture J-1), dashboard admin avec jauges taux de pertinence. |
+| **Usabilité** | Interface mobile-first. Badge "Marché ouvert" temps réel (JS `Intl.DateTimeFormat` Europe/Paris). Blocage visuel du bouton Vente si 0 actions. Montant total auto-calculé sur blur. Note admin si évaluations incomplètes (< 22h). |
 
 ---
 
@@ -63,9 +63,9 @@
 
 | Sous-critère | Ce qui est fait dans SDE |
 |---|---|
-| **Librairies externes** | `yfinance`, `vaderSentiment`, `feedparser`, `newsapi-python`, `transformers` (FinBERT optionnel), `groq`, `bcrypt`, `PyYAML`. |
-| **Connexion APIs distantes** | **NewsAPI** (articles financiers), **Yahoo Finance** via yfinance (cours, fondamentaux, insider), **Groq API** (LLM llama-3.3-70b pour explication IA). |
-| **Maps / GPS / Audio / Vidéo** | Non applicable pour ce projet. |
+| **Librairies externes** | `yfinance`, `vaderSentiment`, `feedparser`, `newsapi-python`, `groq`, `bcrypt`, `finnhub-python`, `twelvedata`, `supabase`, `plotly`, `matplotlib`, `ta` (indicateurs techniques). |
+| **Connexion APIs distantes** | **NewsAPI** (articles financiers), **Yahoo Finance** via yfinance (cours, fondamentaux, historique, insider), **Finnhub** (quote temps réel), **Twelve Data** (historique OHLCV fallback), **Groq API** (LLaMA 3.3-70b explication IA), **Supabase REST** (persistance), **Resend** (emails HTTP). |
+| **Maps / GPS / Audio / Vidéo** | Non applicable. |
 
 ---
 
@@ -73,10 +73,10 @@
 
 | Sous-critère | Ce qui est fait dans SDE |
 |---|---|
-| **Routes** | SDE utilise **Streamlit** (pas Flask). L'UI et la logique métier sont couplées dans `app.py` via callbacks Streamlit. |
-| **Authentification** | `streamlit-authenticator` : hash bcrypt des mots de passe dans `users.yaml`, cookie de session signé (clé dans `config.py`). |
-| **SGBD** | Pas de base SQL ; persistance légère en JSON (adapté au volume). Extension possible vers SQLite/Firebase. |
-| **Modélisation des données** | Structures dict typées : `WatchlistItem`, résultat `run()` (score, reco, market, news, explication). |
+| **Routes** | SDE est une application Flask complète avec Blueprints. Routes principales : `/` (accueil), `/analyze/<ticker>` (analyse), `/portfolio/overview` (positions), `/portfolio/advice/<ticker>` (conseil AJAX), `/admin/dashboard` + `/admin/stats` (KPIs), `/scheduler/run` (cron), `/auth/login` · `/register` · `/logout`. |
+| **Authentification** | Flask-Login (session persistante) + bcrypt (hash mots de passe) + Flask-WTF CSRF. Middleware `@login_required` sur toutes les routes protégées. Admin protégé par vérification `current_user.email in ADMIN_EMAILS`. |
+| **SGBD** | PostgreSQL via Supabase REST. Tables : `users`, `watchlist`, `scores`, `ticker_snapshots`, `positions`, `daily_advice`. RLS activé, accès via `service_role` key. |
+| **Modélisation des données** | `positions` : lots typés (achat/vente) avec `conseil_date`. `daily_advice` : conseil + évaluation J+1 (`bon_conseil`, `variation_j1`). `ticker_snapshots` : payload JSONB (DataFrames sérialisés). |
 
 ---
 
@@ -84,10 +84,10 @@
 
 | Sous-critère | Ce qui est fait dans SDE |
 |---|---|
-| **Collection des données** | `data/market.py` : DataFrame yfinance (OHLCV, 90j). `data/news.py` : DataFrame d'articles (titre, source, sentiment, type). |
-| **Visualisation** | `ui/charts.py` : chandelier Plotly, RSI, moyennes mobiles 20/50j. `ui/gauge.py` : jauge score composite. |
-| **Test accessibilité APIs** | `test_market.py`, `test_news.py`, `test_media.py` : vérifient que les sources retournent des données valides. |
-| **Modules externes** | `pandas 2.2`, `numpy 1.26`, `plotly 6`. |
+| **Collection des données** | `data/market.py` : DataFrame yfinance (OHLCV 90j + fondamentaux). `data/news.py` : DataFrame articles (titre, source, sentiment, type). `portfolio/evaluator.py` : DataFrame historique yfinance pour évaluation batch J+1. |
+| **Visualisation** | `ui/charts.py` : chandelier Plotly interactif, RSI, MAs 20/50j. `flask_app/blueprints/admin.py` : barres de pertinence HTML dynamiques. Jauges score via CSS pur (pas de lib externe). |
+| **Test accessibilité APIs** | Scripts `test_market.py`, `test_news.py` dans le dossier `tests/`. |
+| **Modules externes** | `pandas 2.2`, `numpy 1.26`, `plotly ≥ 5.24`, `ta 0.11` (RSI, MACD, Bollinger). |
 
 ---
 
@@ -95,10 +95,10 @@
 
 | Sous-critère | Ce qui est fait dans SDE |
 |---|---|
-| **GIT** | Repo GitHub avec historique de commits ; `.github/workflows/` versionné ; `[skip ci]` sur commits automatiques. |
-| **Docker** | Pas encore de Dockerfile dans SDE. _(À ajouter : `FROM python:3.11-slim`, `COPY requirements.txt`, `CMD streamlit run app.py`)_. |
-| **Déploiement** | **GitHub Actions** (`scheduler.yml`) : cron horaire, exécution `scheduler.py --once`, commit automatique `last_scores.json`. |
-| **Testing** | `test_full.py` (pipeline complet), `test_market.py`, `test_news.py`, `test_media.py`, `test_signals/`. |
+| **GIT** | Repo GitHub `cybkilla/SDE_FLASK` avec historique de commits conventionnels (`feat:`, `fix:`, `refactor:`). GitHub Push Protection active (détection de secrets). |
+| **Docker** | Pas de Dockerfile (gunicorn + Render suffisants). `Procfile` implicite via `gunicorn.conf.py`. |
+| **Déploiement** | **Render** (cloud, free tier) : auto-deploy sur push `main`. **cron-job.org** : scheduler toutes les 30 min via `POST /scheduler/run` + header secret. |
+| **Sécurité** | Clés API via `os.getenv()` exclusivement. `.env` gitignored. CSRF sur toutes les routes AJAX. `SUPABASE_SERVICE_KEY` server-side uniquement. Sessions HTTP-only SameSite=Lax. |
 
 ---
 
@@ -106,23 +106,26 @@
 
 | Sous-critère | Ce qui est fait dans SDE |
 |---|---|
-| **Proof of work** | Score composite 0-100 → recommandation ACHETER / NEUTRE / VENDRE avec explication LLM en 3 phrases. |
-| **Usages incrémentables** | Ajout de tickers watchlist à la volée, multi-utilisateurs (`users.yaml`), seuils configurables dans `config.py`. |
-| **Formulaires / interfaces avancées** | Formulaire login sidebar, recherche ticker avec autocomplétion, gestion watchlist (ajout/suppression). |
-| **Options de développement à venir** | FinBERT GPU pour sentiment plus précis, vue portfolio agrégée, scoring sectoriel avancé, Dockerfile + déploiement cloud. |
-| **Exploitation commerciale** | Outil d'aide à la décision pour investisseurs particuliers ; base pour un SaaS de screener boursier personnalisé. |
+| **Proof of work** | Score composite 0-100 → recommandation ACHETER/NEUTRE/VENDRE → conseil journalier 6 niveaux (ACHETER / RENFORCER / TENIR / SURVEILLER / ALLÉGER / VENDRE) → évaluation automatique J+1 → taux de pertinence admin. |
+| **Usages incrémentables** | Multi-utilisateurs, multi-tickers, DCA (plusieurs lots), ventes partielles, conseil lié explicitement à chaque transaction, admin KPIs cross-utilisateur. |
+| **Formulaires / interfaces avancées** | Modal transaction : toggle Achat/Vente, pré-saisie prix live + quantité suggérée, calcul bidir prix×qté↔montant, validation quantité entière, blocage vente si solde nul. Watchlist AJAX modale. Recherche autocomplete. |
+| **Options de développement à venir** | Alertes email sur signal conseil (pas seulement variation). Vue portefeuille consolidé multi-ticker (allocation, bêta). Scoring sectoriel avancé. FinBERT GPU pour sentiment plus précis. |
+| **Exploitation commerciale** | Outil d'aide à la décision pour investisseurs particuliers. Base pour un SaaS de screener + coach boursier personnalisé. Différenciant : évaluation objective de la pertinence de ses propres conseils (taux de fiabilité). |
 
 ---
 
 ## Points forts à mettre en avant
 
-- Pipeline entièrement **découplé** : chaque source d'analyse est indépendante et testable seule.
-- **Alertes automatisées** sans infrastructure payante (GitHub Actions gratuit).
-- **Fallback LLM** : Groq cloud → Ollama local si quota épuisé.
-- Gestion robuste des **cas limites** : tickers sans données, colonnes absentes dans yfinance, index Pandas mal alignés.
+- **Pipeline entièrement découplé** : chaque source d'analyse est indépendante et testable seule.
+- **Évaluation objective des conseils** : `evaluate_pending()` mesure automatiquement si le conseil J était juste via yfinance J+1 — boucle de rétroaction unique.
+- **P&L complet** : réalisé (encaissé) et latent calculés séparément, même sur positions clôturées.
+- **`conseil_date`** : lien explicite transaction ↔ conseil, élimine les faux positifs de l'heuristique date/type.
+- **Statut marché temps réel** : `Intl.DateTimeFormat` Europe/Paris côté client — aucune dépendance serveur.
+- **Sécurité production** : CSRF + service_role key + GitHub Push Protection + sessions HTTP-only.
 
 ## Lacunes à mentionner honnêtement
 
-- Pas de Dockerfile (Streamlit se déploie facilement mais non containerisé).
-- Pas de base SQL (JSON suffisant au prototype, limite à grande échelle).
-- Pas de tests unitaires sur `analysis/scoring.py` (couverture partielle).
+- Pas de tests unitaires sur `analysis/scoring.py` et `portfolio/evaluator.py` (couverture partielle).
+- Render free tier : cold start 30–60 s après inactivité, RAM 512 MB (workers=1 obligatoire).
+- Évaluation J+1 imparfaite pour les weekends (samedi → évalué avec le cours du lundi suivant).
+- Pas de Dockerfile (déploiement Render natif mais non containerisé).

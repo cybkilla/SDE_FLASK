@@ -1,6 +1,6 @@
 # SDE — Stock Decision Engine (Flask)
 
-Application web d'aide à la décision boursière. Analyse n'importe quelle action cotée en combinant signaux techniques, données fondamentales, analyse médiatique et synthèse par IA.
+Application web d'aide à la décision boursière. Analyse n'importe quelle action cotée en combinant signaux techniques, données fondamentales, analyse médiatique et synthèse IA. Gestion de portefeuille avec conseil journalier personnalisé et évaluation automatique de la pertinence des conseils.
 
 ## Fonctionnalités
 
@@ -18,18 +18,33 @@ Application web d'aide à la décision boursière. Analyse n'importe quelle acti
 - **Figures chartistes** : détection de 12 patterns avec explication contextuelle
 
 ### Portfolio & Conseil
-- **Positions** : enregistrement des lots d'achat par ticker (DCA supporté), P&L en temps réel
-- **Conseil du jour** : recommandation journalière rule-based (sans LLM) combinant score SDE, RSI, P&L de la position et pattern chandelier détecté
-- **Historique des conseils** : évaluation automatique J+1 (bon/mauvais conseil), taux de fiabilité
+- **Positions** : enregistrement des lots d'achat et de vente par ticker (DCA supporté)
+- **P&L complet** : gain/perte latent(e) sur positions ouvertes + gain/perte encaissé(e) sur positions clôturées, calculés séparément
+- **Vente validée** : blocage serveur et client si solde d'actions insuffisant ; quantité entière uniquement
+- **Conseil du jour** : recommandation journalière rule-based (ACHETER / RENFORCER / TENIR / SURVEILLER / ALLÉGER / VENDRE) combinant score SDE, RSI, P&L et pattern chandelier
+- **Conseil immutable** : un seul conseil par ticker et par jour — pas de régénération intempestive
+- **Suivi de conseil** : lien explicite `conseil_date` entre chaque transaction et le conseil qui l'a déclenchée
+- **Historique** : 14 derniers conseils avec taux de fiabilité calculé automatiquement
+- **Pré-saisie modale** : clic sur le badge conseil → modal pré-rempli (type, prix live, quantité suggérée)
+
+### Dashboard Admin
+- Accessible aux emails listés dans `ADMIN_EMAILS`
+- **Évaluation automatique J+1** : `evaluate_pending()` évalue les conseils passés via yfinance (variation J → J+1)
+- **Taux de pertinence global** : % de bons conseils sur l'ensemble de l'historique
+- **Taux sur conseils suivis** : pertinence uniquement sur les conseils qui ont déclenché une transaction
+- **Breakdown par type** : taux par action (ACHETER, RENFORCER, TENIR, SURVEILLER, ALLÉGER, VENDRE)
+- **Breakdown par ticker** : taux de fiabilité et dernier conseil pour chaque valeur suivie
+- Note automatique si consulté avant 22h00 (évaluations J+1 incomplètes avant clôture)
 
 ### Plateforme
+- **Statut marché NASDAQ** : badge "Marché ouvert" (15h30–22h00 heure de Paris) / "Clôture J-1" sur tous les affichages de prix
 - **Watchlist** personnelle (AJAX, sans rechargement de page)
 - **Cache 3 niveaux** : mémoire 15 min → snapshot Supabase 24h → pipeline complet
 - **Prix live** : superposition du prix Finnhub en temps réel sur les analyses en cache
 - **Authentification** : inscription / connexion / sessions persistantes (Flask-Login + bcrypt)
 - **Alertes email** : notification sur variation de cours ou changement de recommandation (Resend HTTP)
 - **Scheduler deux vitesses** : prix live toutes les 30 min (Finnhub léger) + pipeline complet 1×/jour
-- **Interface responsive** : navbar intégrée, mobile-first
+- **Interface responsive** : navbar intégrée, mobile-first, Bootstrap 5
 
 ## Stack technique
 
@@ -96,6 +111,9 @@ RESEND_FROM=SDE StockDecisionEngine <onboarding@resend.dev>
 
 # Scheduler
 CRON_SECRET=un_token_aleatoire_long
+
+# Admin dashboard
+ADMIN_EMAILS=votre_email@domaine.com
 ```
 
 Sources des clés :
@@ -157,7 +175,8 @@ sde_flask/
 │   ├── blueprints/
 │   │   ├── auth.py           # Routes /auth/login, /register, /logout
 │   │   ├── stock.py          # Routes /, /analyze/<ticker>, /api/search, /watchlist
-│   │   ├── portfolio.py      # Routes /portfolio/positions, /portfolio/advice
+│   │   ├── portfolio.py      # Routes /portfolio/positions, /portfolio/advice, /portfolio/overview
+│   │   ├── admin.py          # Route /admin/dashboard, /admin/stats (ADMIN_EMAILS requis)
 │   │   └── cron.py           # Route /scheduler/run (protégée par CRON_SECRET)
 │   ├── static/
 │   │   ├── css/sde.css       # Design system (Dashboard Financier)
@@ -165,9 +184,11 @@ sde_flask/
 │   │       ├── search.js     # Autocomplete navbar
 │   │       └── watchlist.js  # AJAX watchlist (modal Bootstrap)
 │   └── templates/
-│       ├── base.html         # Layout : navbar, modal watchlist, scripts
+│       ├── base.html         # Layout : navbar, modal watchlist, sdeMarketStatus() JS
 │       ├── home.html         # Page d'accueil
-│       ├── analysis.html     # Page d'analyse + section Ma position
+│       ├── analysis.html     # Page d'analyse + section Ma position + modal transaction
+│       ├── portfolio.html    # Vue d'ensemble positions + P&L + conseils du jour
+│       ├── admin.html        # Dashboard admin : taux pertinence conseils
 │       └── auth/
 ├── analysis/
 │   ├── scoring.py            # Score global pondéré (technique + fondamental + médiatique)
@@ -182,7 +203,9 @@ sde_flask/
 │   └── insider.py            # Transactions insiders
 ├── portfolio/
 │   ├── positions.py          # get_portfolio_summary(), add_position(), delete_position()
-│   └── advisor.py            # generate_advice() — conseil rule-based (SDE + RSI + P&L + chandelier)
+│   │                         # P&L séparé : pnl_realise + pnl_non_realise + position_fermee
+│   ├── advisor.py            # generate_advice() — conseil rule-based (SDE + RSI + P&L + chandelier)
+│   └── evaluator.py          # evaluate_pending() J+1 yfinance + get_global_stats() admin KPIs
 ├── alerts/
 │   ├── scheduler.py          # Architecture deux vitesses (Finnhub live + snapshot + pipeline)
 │   └── mailer.py             # Envoi alertes via Resend
@@ -204,8 +227,19 @@ Voir `doc/SUPABASE.md` pour le schéma SQL complet et les politiques RLS.
 | `watchlist` | Tickers suivis par utilisateur |
 | `scores` | Dernier score/reco connu par ticker |
 | `ticker_snapshots` | Résultats pipeline sérialisés (cache 24h) |
-| `positions` | Lots d'achat par utilisateur et ticker |
-| `daily_advice` | Conseils journaliers + évaluation J+1 |
+| `positions` | Lots d'achat ET de vente — colonnes `type` (achat/vente) et `conseil_date` |
+| `daily_advice` | Conseils journaliers + évaluation J+1 (`bon_conseil`, `variation_j1`) |
+
+## Horaires de trading NASDAQ
+
+Le NASDAQ est ouvert de **15h30 à 22h00 heure de Paris** (lundi–vendredi).
+
+SDE utilise cette plage pour :
+- Afficher le badge "Marché ouvert" / "Clôture J-1" sur tous les prix
+- Informer l'admin que les évaluations J+1 sont incomplètes avant 22h00
+- Interpréter les prix live (yfinance renvoie le cours de clôture J-1 hors séance)
+
+La détection s'effectue côté client via `window.sdeMarketStatus()` (JavaScript, `Intl.DateTimeFormat` avec timezone `Europe/Paris`).
 
 ## Sécurité
 
@@ -215,6 +249,7 @@ Voir `doc/SUPABASE.md` pour le schéma SQL complet et les politiques RLS.
 - RLS activé sur toutes les tables Supabase ; `SUPABASE_SERVICE_KEY` (service_role) uniquement côté serveur
 - Protection CSRF sur tous les formulaires et requêtes AJAX (Flask-WTF + header `X-CSRFToken`)
 - Sessions HTTP-only, SameSite=Lax
+- `ADMIN_EMAILS` : accès dashboard admin vérifié via `current_user.email` (pas `current_user.id`)
 
 ## Avertissement
 
