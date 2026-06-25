@@ -435,7 +435,14 @@
       {% if charts.price_b64 %}
       <img src="{{ charts.price_b64 }}" alt="Cours 30j" class="img-fluid w-100" loading="lazy">
       {% else %}
-      <p class="text-center text-muted small py-4">Graphique indisponible</p>
+      <div class="text-center py-5">
+        <i class="bi bi-bar-chart-line" style="font-size:2rem;color:var(--sde-muted)"></i>
+        <p class="text-muted small mt-2 mb-1">Graphique indisponible — données de marché insuffisantes pour {{ ticker }}.</p>
+        <a href="{{ url_for('stock.analyze', ticker=ticker) }}?nocache=1"
+           class="sde-nav-btn" style="font-size:.78rem" data-sde-loading="Analyse de {{ ticker }}…">
+          <i class="bi bi-arrow-clockwise me-1"></i>Régénérer l'analyse
+        </a>
+      </div>
       {% endif %}
     </div>
 
@@ -443,7 +450,7 @@
       {% if charts.rsi_b64 %}
       <img src="{{ charts.rsi_b64 }}" alt="RSI 14j" class="img-fluid w-100" loading="lazy">
       {% else %}
-      <p class="text-center text-muted small py-4">Graphique indisponible</p>
+      <p class="text-center text-muted small py-4">RSI indisponible — historique trop court (&lt; 14 jours de données).</p>
       {% endif %}
     </div>
 
@@ -451,7 +458,7 @@
       {% if charts.candle_json %}
       <div id="sde-candle-chart" style="height:460px"></div>
       {% else %}
-      <p class="text-center text-muted small py-4">Graphique indisponible</p>
+      <p class="text-center text-muted small py-4">Chandeliers indisponibles — données insuffisantes.</p>
       {% endif %}
 
       {% if candle_pattern %}

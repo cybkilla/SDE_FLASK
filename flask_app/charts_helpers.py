@@ -26,25 +26,38 @@ def plotly_to_json(fig) -> str:
 def build_charts(hist, ticker: str) -> dict:
     """
     Génère les 3 graphiques et retourne un dict prêt pour le template.
-    Retourne {} en cas d'erreur globale, None par graphique si erreur partielle.
+    Retourne None par graphique en cas d'erreur partielle (avec log).
     """
+    import pandas as pd
+
     charts = {}
+
+    if hist is None or (isinstance(hist, pd.DataFrame) and hist.empty):
+        print(f"[Charts] {ticker} — historique vide, graphiques ignorés", flush=True)
+        return {"price_b64": None, "rsi_b64": None, "candle_json": None}
+
+    n = len(hist)
+
     try:
         from ui.charts import plot_price
         charts["price_b64"] = fig_to_b64(plot_price(hist, ticker))
-    except Exception:
+    except Exception as e:
+        print(f"[Charts] {ticker} price — {type(e).__name__}: {e}", flush=True)
         charts["price_b64"] = None
 
     try:
         from ui.charts import plot_rsi
         charts["rsi_b64"] = fig_to_b64(plot_rsi(hist))
-    except Exception:
+    except Exception as e:
+        print(f"[Charts] {ticker} RSI — {type(e).__name__}: {e}", flush=True)
         charts["rsi_b64"] = None
 
     try:
         from ui.charts import plot_candlestick
         charts["candle_json"] = plotly_to_json(plot_candlestick(hist, ticker))
-    except Exception:
+    except Exception as e:
+        print(f"[Charts] {ticker} candle — {type(e).__name__}: {e}", flush=True)
         charts["candle_json"] = None
 
+    charts["_rows"] = n  # transmis au template pour le message d'info
     return charts

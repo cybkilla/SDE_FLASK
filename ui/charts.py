@@ -23,8 +23,12 @@ plt.rcParams.update({
 
 def plot_price(hist: pd.DataFrame, ticker: str):
     """Cours 30j + volume. hist = DataFrame Pandas enrichi."""
+    if hist is None or len(hist) < 2:
+        raise ValueError(f"Historique insuffisant ({len(hist) if hist is not None else 0} lignes)")
     df    = hist.tail(30)
-    close = df["Close"]
+    close = df["Close"].dropna()
+    if len(close) < 2:
+        raise ValueError("Série Close vide après dropna")
     color = "#00e57a" if close.iloc[-1] >= close.iloc[0] else "#ff3d5a"
 
     fig = plt.figure(figsize=(11, 6), constrained_layout=True)
@@ -53,7 +57,11 @@ def plot_price(hist: pd.DataFrame, ticker: str):
 
 def plot_rsi(hist: pd.DataFrame):
     """RSI 14j avec zones colorées depuis pd.Series."""
-    df = hist.tail(30)["RSI"]
+    if hist is None or "RSI" not in hist.columns:
+        raise ValueError("Colonne RSI absente")
+    df = hist.tail(30)["RSI"].dropna()
+    if df.empty:
+        raise ValueError("RSI vide (historique trop court pour 14 jours)")
     v  = df.iloc[-1]
     c  = "#ff3d5a" if v > 70 else "#00e57a" if v < 30 else "#f5c842"
     fig, ax = plt.subplots(figsize=(11, 3), constrained_layout=True)
@@ -89,6 +97,8 @@ def plot_macd(hist: pd.DataFrame):
 
 def plot_candlestick(hist: pd.DataFrame, ticker: str) -> go.Figure:
     """Chandeliers japonais (Plotly) avec MA20/MA50 et figures chartistes annotées."""
+    if hist is None or len(hist) < 3:
+        raise ValueError(f"Historique insuffisant pour les chandeliers")
     from analysis.candle_patterns import detect_patterns
 
     df       = hist.tail(60).copy()
