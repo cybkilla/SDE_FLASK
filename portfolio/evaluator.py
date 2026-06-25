@@ -130,23 +130,42 @@ def get_global_stats() -> dict:
         .data or []
     )
 
+    # Conseils explicitement suivis (position liée via conseil_date)
+    followed_rows = (
+        _client.table("positions")
+        .select("ticker,conseil_date,type")
+        .not_.is_("conseil_date", "null")
+        .execute()
+        .data or []
+    )
+    # Clés (ticker, conseil_date) des conseils suivis
+    followed_keys = {(r["ticker"], r["conseil_date"]) for r in followed_rows}
+
     if not rows:
         return {"total": 0, "bons": 0, "mauvais": 0, "taux_pct": None,
-                "by_action": {}, "by_ticker": []}
+                "by_action": {}, "by_ticker": [], "suivis": 0, "taux_suivi_pct": None}
 
     total   = len(rows)
     bons    = sum(1 for r in rows if r["bon_conseil"])
     mauvais = total - bons
     taux    = round(bons / total * 100, 1) if total else None
 
+    # Conseils évalués ET suivis (intersection)
+    suivis_evalues = [r for r in rows if (r["ticker"], r["date_conseil"]) in followed_keys]
+    nb_suivis      = len(followed_keys)
+    nb_bons_suivis = sum(1 for r in suivis_evalues if r["bon_conseil"])
+    taux_suivi     = round(nb_bons_suivis / len(suivis_evalues) * 100, 1) if suivis_evalues else None
+
     # ── Par action ──
     action_stats: dict[str, dict] = {}
     for r in rows:
         a = r.get("action", "?")
-        s = action_stats.setdefault(a, {"total": 0, "bons": 0})
+        s = action_stats.setdefault(a, {"total": 0, "bons": 0, "suivis": 0})
         s["total"] += 1
         if r["bon_conseil"]:
             s["bons"] += 1
+        if (r["ticker"], r["date_conseil"]) in followed_keys:
+            s["suivis"] += 1
     for a, s in action_stats.items():
         s["taux_pct"] = round(s["bons"] / s["total"] * 100, 1) if s["total"] else None
 
@@ -155,10 +174,12 @@ def get_global_stats() -> dict:
     for r in rows:
         t = r["ticker"]
         s = ticker_stats.setdefault(t, {"ticker": t, "total": 0, "bons": 0,
-                                        "last_date": "", "last_action": ""})
+                                        "suivis": 0, "last_date": "", "last_action": ""})
         s["total"] += 1
         if r["bon_conseil"]:
             s["bons"] += 1
+        if (r["ticker"], r["date_conseil"]) in followed_keys:
+            s["suivis"] += 1
         if r["date_conseil"] > s["last_date"]:
             s["last_date"]   = r["date_conseil"]
             s["last_action"] = r["action"]
@@ -169,10 +190,13 @@ def get_global_stats() -> dict:
     ticker_list = sorted(ticker_stats.values(), key=lambda x: -x["total"])
 
     return {
-        "total":     total,
-        "bons":      bons,
-        "mauvais":   mauvais,
-        "taux_pct":  taux,
-        "by_action": action_stats,
+        "total":           total,
+        "bons":            bons,
+        "mauvais":         mauvais,
+        "taux_pct":        taux,
+        "suivis":          nb_suivis,
+        "bons_suivis":     nb_bons_suivis,
+        "taux_suivi_pct":  taux_suivi,
+        "by_action":       action_stats,
         "by_ticker": ticker_list,
     }

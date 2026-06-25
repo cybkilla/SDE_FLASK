@@ -797,29 +797,22 @@ const sdePortfolio = (function () {
           </div>
           <div style="padding:0 2px">${lots}</div>`;
 
-        // Marquer le badge conseil "✓ Suivi" si une transaction aujourd'hui correspond
-        _markAdviceBadgeIfFollowed(s.lots);
+        // ✓ Suivi fiable : basé sur conseil_date (lien explicite)
+        const today   = new Date().toISOString().slice(0, 10);
+        const followed = s.lots.some(l => l.conseil_date === today);
+        const badge   = document.getElementById("sde-advice-badge");
+        if (followed && badge) {
+          badge.insertAdjacentHTML("beforeend",
+            `<span style="font-size:.68rem;background:rgba(255,255,255,.25);
+                          border-radius:10px;padding:1px 7px;margin-left:6px;font-weight:600">
+               ✓ Suivi
+             </span>`);
+        }
       })
       .catch(() => {
         document.getElementById("sde-positions-wrap").innerHTML =
           `<p class="text-danger small">Erreur de chargement des positions.</p>`;
       });
-  }
-
-  function _markAdviceBadgeIfFollowed(lots) {
-    const badge = document.getElementById("sde-advice-badge");
-    if (!badge || !_currentAdviceAction) return;
-    const modalType = _ACTION_TYPE[_currentAdviceAction];
-    if (!modalType) return;
-    const today = new Date().toISOString().slice(0, 10);
-    const followed = lots.some(l => l.date_achat === today && l.type === modalType);
-    if (!followed) return;
-    badge.style.paddingRight = "10px";
-    badge.insertAdjacentHTML("beforeend",
-      `<span style="font-size:.68rem;background:rgba(255,255,255,.25);
-                    border-radius:10px;padding:1px 7px;margin-left:6px;font-weight:600">
-         ✓ Suivi
-       </span>`);
   }
 
   /* ── Conseil du jour ── */
@@ -855,9 +848,10 @@ const sdePortfolio = (function () {
                               font-weight:700;font-size:.88rem;letter-spacing:.01em`;
         const badgeContent = `${icon} ${a.action}${qtyTxt}`;
         const suggestedQty = a.quantite_suggeree ? parseFloat(a.quantite_suggeree) : null;
+        const today_cd = new Date().toISOString().slice(0, 10);
         const badge = modalType
           ? `<span id="sde-advice-badge" style="${badgeStyle};cursor:pointer"
-                   onclick="sdePortfolio.openAddModal('${modalType}', LIVE_PRICE, ${suggestedQty})"
+                   onclick="sdePortfolio.openAddModal('${modalType}', LIVE_PRICE, ${suggestedQty}, '${today_cd}')"
                    title="Ouvrir la saisie de ${modalType === 'achat' ? 'l\'achat' : 'la vente'}">
                ${badgeContent} <i class="bi bi-pencil-square" style="font-size:.7rem;opacity:.8"></i>
              </span>`
@@ -954,9 +948,12 @@ const sdePortfolio = (function () {
       : '<i class="bi bi-check-circle me-1"></i>Enregistrer';
   }
 
-  function openAddModal(type, price, qty) {
+  let _conseilDate = null;  // date du conseil suivi (null si saisie manuelle)
+
+  function openAddModal(type, price, qty, conseilDate) {
     const t = type || "achat";
-    _posType = t;
+    _posType     = t;
+    _conseilDate = conseilDate || null;
     setPosType(t);
     document.getElementById("sde-pos-date").value  = new Date().toISOString().slice(0,10);
     document.getElementById("sde-pos-qty").value   = (qty != null && !isNaN(qty) && qty > 0)
@@ -971,14 +968,15 @@ const sdePortfolio = (function () {
   function submitAdd() {
     const errEl = document.getElementById("sde-pos-error");
     const body = {
-      ticker:     TICKER,
-      company:    COMPANY,
-      date_achat: document.getElementById("sde-pos-date").value,
-      quantite:   parseFloat(document.getElementById("sde-pos-qty").value),
-      prix_achat: parseFloat(document.getElementById("sde-pos-price").value),
-      currency:   "USD",
-      notes:      document.getElementById("sde-pos-notes").value,
-      type:       _posType,
+      ticker:       TICKER,
+      company:      COMPANY,
+      date_achat:   document.getElementById("sde-pos-date").value,
+      quantite:     parseFloat(document.getElementById("sde-pos-qty").value),
+      prix_achat:   parseFloat(document.getElementById("sde-pos-price").value),
+      currency:     "USD",
+      notes:        document.getElementById("sde-pos-notes").value,
+      type:         _posType,
+      conseil_date: _conseilDate,
     };
     if (!body.date_achat || isNaN(body.quantite) || isNaN(body.prix_achat)) {
       errEl.textContent = "Date, quantité et prix sont obligatoires.";

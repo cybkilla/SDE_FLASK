@@ -104,9 +104,15 @@
             <span><strong style="color:#1D9E75">${stats.bons}</strong> <span style="color:var(--sde-muted)">bons</span></span>
             <span><strong style="color:#D85A30">${stats.mauvais}</strong> <span style="color:var(--sde-muted)">mauvais</span></span>
             <span><strong style="color:var(--sde-navy)">${stats.total}</strong> <span style="color:var(--sde-muted)">évalués</span></span>
+            ${stats.suivis > 0 ? `<span style="color:var(--sde-teal)"><strong>${stats.suivis}</strong> <span style="color:var(--sde-muted)">suivis</span></span>` : ""}
             ${newlyEval > 0 ? `<span style="color:var(--sde-teal);font-size:.78rem"><i class="bi bi-check2-circle"></i> ${newlyEval} nouveaux</span>` : ""}
           </div>
           ${gauge(taux, color)}
+          ${stats.taux_suivi_pct !== null ? `
+          <div style="margin-top:8px">
+            <div style="font-size:.75rem;color:var(--sde-muted);margin-bottom:4px">Taux sur conseils suivis</div>
+            ${gauge(stats.taux_suivi_pct)}
+          </div>` : ""}
         </div>
       </div>`;
   }

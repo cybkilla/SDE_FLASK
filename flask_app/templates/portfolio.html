@@ -165,11 +165,12 @@
     const suggestedQty = a.quantite_suggeree ? parseFloat(a.quantite_suggeree) : 0;
     const companyEsc   = (company || ticker).replace(/'/g, "\\'");
     const badgeInner   = `${icon} ${a.action}${qty}`;
+    const today_cd     = new Date().toISOString().slice(0, 10);
     const badge = modalType
       ? `<span style="background:${color};color:#fff;padding:4px 12px;border-radius:20px;
                       font-weight:700;font-size:.82rem;letter-spacing:.01em;
                       cursor:pointer"
-               onclick="openAddModal('${ticker}','${companyEsc}','${currency || "USD"}',${livePrice || 0},'${modalType}',${suggestedQty})"
+               onclick="openAddModal('${ticker}','${companyEsc}','${currency || "USD"}',${livePrice || 0},'${modalType}',${suggestedQty},'${today_cd}')"
                title="Saisir ${modalType === 'achat' ? 'un achat' : 'une vente'}">
            ${badgeInner}
            ${followed
@@ -258,12 +259,9 @@
     const pColor2 = s.pnl_pct >= 0 ? "#1D9E75" : "#D85A30";
     const pSign   = s.pnl_euros >= 0 ? "+" : "−";
 
-    // Vérifier si le conseil du jour a déjà été suivi aujourd'hui
-    const today      = new Date().toISOString().slice(0, 10);
-    const modalType  = a ? _ACTION_TYPE[a.action] : null;
-    const followed   = modalType && (s.lots || []).some(
-      l => l.date_achat === today && l.type === modalType
-    );
+    // ✓ Suivi fiable : basé sur conseil_date (lien explicite avec le conseil du jour)
+    const today    = new Date().toISOString().slice(0, 10);
+    const followed = (s.lots || []).some(l => l.conseil_date === today);
 
     return `
 <div class="sde-card mb-3" id="card-${ticker}" data-sym="${sym}" data-currency="${currency}" data-price="${price || 0}">
@@ -353,12 +351,15 @@
   }
 
   /* ── Modal ajout ── */
-  function openAddModal(ticker, company, currency, price, type, qty) {
+  let _modalConseilDate = null;
+
+  function openAddModal(ticker, company, currency, price, type, qty, conseilDate) {
     const t = type || "achat";
-    _modalTicker   = ticker;
-    _modalCompany  = company;
-    _modalCurrency = currency || "USD";
-    _modalPosType  = t;
+    _modalTicker      = ticker;
+    _modalCompany     = company;
+    _modalCurrency    = currency || "USD";
+    _modalPosType     = t;
+    _modalConseilDate = conseilDate || null;
     setPosType(t);
     document.getElementById("sde-modal-ticker-label").textContent = ticker;
     document.getElementById("sde-pos-date").value  = new Date().toISOString().slice(0, 10);
@@ -381,7 +382,8 @@
       prix_achat: parseFloat(document.getElementById("sde-pos-price").value),
       currency:   _modalCurrency,
       notes:      document.getElementById("sde-pos-notes").value,
-      type:       _modalPosType,
+      type:         _modalPosType,
+      conseil_date: _modalConseilDate,
     };
     if (!body.date_achat || isNaN(body.quantite) || isNaN(body.prix_achat)) {
       errEl.textContent = "Date, quantité et prix sont obligatoires.";

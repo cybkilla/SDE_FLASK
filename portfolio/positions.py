@@ -95,19 +95,20 @@ def get_portfolio_summary(username: str, ticker: str, current_price: float) -> d
 def add_position(username: str, ticker: str, company: str,
                  date_achat: str, prix_achat: float,
                  quantite: float, currency: str = "USD", notes: str = "",
-                 type_op: str = "achat") -> dict:
+                 type_op: str = "achat", conseil_date: str = None) -> dict:
     """Insère un lot d'achat ou de vente. Retourne la ligne créée."""
     ticker = ticker.upper()
     row = {
-        "username":   username,
-        "ticker":     ticker,
-        "company":    company,
-        "date_achat": str(date_achat),
-        "prix_achat": float(prix_achat),
-        "quantite":   float(quantite),
-        "currency":   currency,
-        "notes":      notes,
-        "type":       type_op if type_op in ("achat", "vente") else "achat",
+        "username":     username,
+        "ticker":       ticker,
+        "company":      company,
+        "date_achat":   str(date_achat),
+        "prix_achat":   float(prix_achat),
+        "quantite":     float(quantite),
+        "currency":     currency,
+        "notes":        notes,
+        "type":         type_op if type_op in ("achat", "vente") else "achat",
+        "conseil_date": conseil_date or None,
     }
     if _db_ok():
         try:

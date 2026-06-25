@@ -29,14 +29,15 @@ def get_positions(ticker: str):
 def add_position():
     """Ajoute un lot d'achat."""
     data = request.get_json(silent=True) or {}
-    ticker     = data.get("ticker", "").strip().upper()
-    company    = data.get("company", "").strip()
-    date_achat = data.get("date_achat", "").strip()
-    prix_achat = data.get("prix_achat")
-    quantite   = data.get("quantite")
-    currency   = data.get("currency", "USD").strip()
-    notes      = data.get("notes", "").strip()
-    type_op    = data.get("type", "achat").strip()
+    ticker       = data.get("ticker", "").strip().upper()
+    company      = data.get("company", "").strip()
+    date_achat   = data.get("date_achat", "").strip()
+    prix_achat   = data.get("prix_achat")
+    quantite     = data.get("quantite")
+    currency     = data.get("currency", "USD").strip()
+    notes        = data.get("notes", "").strip()
+    type_op      = data.get("type", "achat").strip()
+    conseil_date = data.get("conseil_date") or None
 
     if not ticker or not date_achat or not prix_achat or not quantite:
         return jsonify({"ok": False, "error": "Champs obligatoires manquants"}), 400
@@ -51,7 +52,7 @@ def add_position():
     try:
         from portfolio.positions import add_position as _add
         row = _add(current_user.id, ticker, company,
-                   date_achat, prix_achat, quantite, currency, notes, type_op)
+                   date_achat, prix_achat, quantite, currency, notes, type_op, conseil_date)
 
         # Invalide le conseil du jour pour qu'il soit régénéré avec la position à jour
         try:
