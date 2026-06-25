@@ -282,6 +282,13 @@
     const today    = new Date().toISOString().slice(0, 10);
     const followed = (s.lots || []).some(l => l.conseil_date === today);
 
+    const _ms = window.sdeMarketStatus ? window.sdeMarketStatus() : { isOpen: false };
+    const mktBadge = _ms.isOpen
+      ? `<span style="display:inline-block;background:#E1F5EE;color:#1D9E75;font-size:.64rem;
+           font-weight:700;padding:1px 6px;border-radius:8px;margin-top:3px">● Marché ouvert</span>`
+      : `<span style="display:inline-block;background:#F1F5F9;color:var(--sde-muted);font-size:.64rem;
+           font-weight:500;padding:1px 6px;border-radius:8px;margin-top:3px">● Clôture J-1</span>`;
+
     return `
 <div class="sde-card mb-3" id="card-${ticker}" data-sym="${sym}" data-currency="${currency}" data-price="${price || 0}" data-shares="${s.total_shares || 0}">
 
@@ -301,7 +308,8 @@
     <div style="text-align:right;flex-shrink:0">
       ${price
         ? `<span style="font-weight:700;font-size:1.25rem;color:${pColor};line-height:1">${sym}${parseFloat(price).toFixed(2)}</span>
-           <br><span style="color:${pColor};font-size:.78rem;font-weight:600">${arr} ${_pct(var_1d)}</span>`
+           <br><span style="color:${pColor};font-size:.78rem;font-weight:600">${arr} ${_pct(var_1d)}</span>
+           <br>${mktBadge}`
         : `<span style="font-size:.78rem;color:var(--sde-muted)">Prix indisponible</span>`}
     </div>
   </div>

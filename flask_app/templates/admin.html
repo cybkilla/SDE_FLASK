@@ -215,7 +215,24 @@
   }
 
   window.loadStats = loadStats;
-  document.addEventListener("DOMContentLoaded", () => loadStats(false));
+  document.addEventListener("DOMContentLoaded", () => {
+    loadStats(false);
+
+    // Note de timing : évaluations J+1 incomplètes avant clôture du marché
+    const ms = window.sdeMarketStatus && window.sdeMarketStatus();
+    if (ms && !ms.isWeekend && !ms.afterClose) {
+      const closesAt = ms.h < 15 || (ms.h === 15 && ms.m < 30)
+        ? `Ouverture à 15h30 — clôture à 22h00`
+        : `Clôture à 22h00 heure de Paris`;
+      const note = document.createElement("p");
+      note.className = "sde-disclaimer mb-3";
+      note.style.cssText = "background:#FEF9E7;border:1px solid #F59E0B;border-radius:8px;padding:8px 12px;color:#92400E";
+      note.innerHTML = `<i class="bi bi-clock me-1"></i><strong>Marché ${ms.isOpen ? "ouvert" : "pas encore ouvert"}</strong> · ${closesAt}.
+        Les évaluations J+1 seront complètes après la clôture (22h00) — certains résultats peuvent manquer.`;
+      const wrap = document.getElementById("sde-global-wrap");
+      if (wrap) wrap.parentElement.insertBefore(note, wrap);
+    }
+  });
 })();
 </script>
 {% endblock %}

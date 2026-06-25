@@ -101,7 +101,7 @@
   <!-- Prix live -->
   <div class="col-12 col-sm-5 col-lg-4">
     <div class="sde-card h-100">
-      <div class="sde-section-title">Prix live</div>
+      <div class="sde-section-title">Prix <span id="sde-mkt-badge"></span></div>
       <div style="font-size:2rem;font-weight:600;color:{{ cvar }};line-height:1.1">
         {{ sym }}{{ "%.2f"|format(market.price) }}
         <span style="font-size:.85rem;font-weight:500;margin-left:6px;vertical-align:middle">
@@ -1109,6 +1109,20 @@ document.addEventListener("DOMContentLoaded", function () {
   const tabBtn = document.getElementById("tab-candle-btn");
   if (tabBtn) tabBtn.addEventListener("shown.bs.tab", renderCandle);
   {% endif %}
+
+  // Badge statut marché
+  (function () {
+    const ms  = window.sdeMarketStatus && window.sdeMarketStatus();
+    const el  = document.getElementById("sde-mkt-badge");
+    if (!ms || !el) return;
+    if (ms.isOpen) {
+      el.innerHTML = `<span style="background:#E1F5EE;color:#1D9E75;font-size:.66rem;
+        font-weight:700;padding:2px 7px;border-radius:10px;vertical-align:middle">● Marché ouvert</span>`;
+    } else {
+      el.innerHTML = `<span style="background:#F1F5F9;color:var(--sde-muted);font-size:.66rem;
+        font-weight:600;padding:2px 7px;border-radius:10px;vertical-align:middle">● Clôture J-1</span>`;
+    }
+  })();
 });
 </script>
 {% endblock %}

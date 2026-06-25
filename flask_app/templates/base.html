@@ -138,6 +138,23 @@
 <script src="{{ url_for('static', filename='js/search.js') }}"></script>
 <script src="{{ url_for('static', filename='js/watchlist.js') }}"></script>
 <script>
+// ── Statut marché NASDAQ (heure de Paris : 15h30-22h00 lun-ven) ──────────────
+window.sdeMarketStatus = function () {
+  const now   = new Date();
+  const wd    = new Intl.DateTimeFormat("en-US",
+    {timeZone:"Europe/Paris", weekday:"short"}).format(now);
+  const parts = new Intl.DateTimeFormat("en-US",
+    {timeZone:"Europe/Paris", hour:"numeric", minute:"numeric", hour12:false}
+  ).formatToParts(now);
+  const h   = parseInt(parts.find(p => p.type === "hour").value);
+  const m   = parseInt(parts.find(p => p.type === "minute").value);
+  const min = h * 60 + m;
+  const isWeekend  = wd === "Sat" || wd === "Sun";
+  const isOpen     = !isWeekend && min >= 15*60+30 && min < 22*60;
+  const afterClose = !isWeekend && min >= 22*60;
+  return { isOpen, isWeekend, h, m, afterClose };
+};
+
 (function () {
   // Spinner sur bouton submit — overlay sombre uniquement si pas data-no-overlay
   document.addEventListener("submit", function (e) {
