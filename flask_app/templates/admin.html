@@ -41,6 +41,32 @@
   <div id="sde-ticker-body"></div>
 </div>
 
+<!-- Configuration des seuils de conseil -->
+<div class="sde-card mt-3" id="sde-config-wrap">
+  <div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
+    <h6 class="fw-semibold mb-0" style="font-size:.85rem;color:var(--sde-navy)">
+      <i class="bi bi-sliders me-1"></i>Calibration des règles de conseil
+    </h6>
+    <div class="d-flex gap-2">
+      <button onclick="resetConfig()"
+              class="sde-nav-btn" style="font-size:.75rem;color:#D85A30">
+        <i class="bi bi-arrow-counterclockwise me-1"></i>Défauts
+      </button>
+      <button onclick="saveConfig()"
+              style="font-size:.75rem;background:#6366F1;color:#fff;border:none;
+                     border-radius:7px;padding:4px 14px;font-weight:600;cursor:pointer">
+        <i class="bi bi-check-circle me-1"></i>Enregistrer
+      </button>
+    </div>
+  </div>
+  <div id="sde-config-body">
+    <p class="text-muted small text-center py-2">
+      <span class="spinner-border spinner-border-sm me-1"></span>Chargement…
+    </p>
+  </div>
+  <p id="sde-config-feedback" class="small mt-2 d-none"></p>
+</div>
+
 <p class="sde-disclaimer mt-2">
   Un conseil est évalué "bon" si la variation de prix J+1 est dans le sens prévu
   (>0% pour Acheter/Renforcer, &lt;0% pour Alléger/Vendre, |Δ|&lt;3% pour Tenir/Surveiller).
@@ -215,6 +241,108 @@
   }
 
   window.loadStats = loadStats;
+
+  /* ── Configuration des seuils ── */
+  const PARAM_META = [
+    { key:"score_acheter",   label:"Score min ACHETER",        unit:"/100", min:40, max:85, step:1,
+      desc:"Score SDE minimum pour conseiller d'acheter sans position existante." },
+    { key:"score_vendre",    label:"Score max VENDRE fort",     unit:"/100", min:20, max:55, step:1,
+      desc:"Score SDE en-dessous duquel un signal VENDRE est considéré fort." },
+    { key:"score_tenir",     label:"Score min TENIR haussier",  unit:"/100", min:45, max:85, step:1,
+      desc:"Score minimum pour confirmer un TENIR sur position bénéficiaire." },
+    { key:"stop_loss_pct",   label:"Stop loss auto",            unit:"%",    min:-50, max:-1, step:1,
+      desc:"P&L % déclenchant une recommandation VENDRE automatique de protection." },
+    { key:"take_profit_pct", label:"Prise de bénéfices",        unit:"%",    min:5,  max:100, step:1,
+      desc:"P&L % à partir duquel un allègement partiel est suggéré si signal baissier." },
+    { key:"pnl_renforcer",   label:"P&L min renforcement",      unit:"%",    min:-25, max:-1, step:1,
+      desc:"P&L % minimal (perte) pour déclencher un conseil de renforcement." },
+    { key:"rsi_renforcer",   label:"RSI max renforcement",      unit:"",     min:25, max:55, step:1,
+      desc:"RSI maximum pour qu'un renforcement sur faiblesse soit suggéré." },
+    { key:"var_tenir_eval",  label:"Tolérance TENIR (éval.)",   unit:"%",    min:1,  max:8,  step:0.5,
+      desc:"Variation J+1 max (%) pour considérer un conseil TENIR/SURVEILLER comme bon." },
+  ];
+
+  let _cfg = {}, _defaults = {};
+
+  function renderConfig(cfg, defaults) {
+    _cfg = {...cfg}; _defaults = {...defaults};
+    const body = document.getElementById("sde-config-body");
+    body.innerHTML = PARAM_META.map(p => {
+      const val = cfg[p.key] ?? defaults[p.key];
+      const isModified = val !== defaults[p.key];
+      return `
+        <div style="padding:10px 0;border-bottom:1px solid var(--sde-border)">
+          <div class="d-flex align-items-center justify-content-between mb-1 flex-wrap gap-1">
+            <label for="cfg-${p.key}"
+                   style="font-size:.8rem;font-weight:600;color:${isModified ? '#6366F1' : 'var(--sde-navy)'}">
+              ${p.label}
+              ${isModified ? `<span style="font-size:.65rem;background:#EEF2FF;color:#6366F1;
+                border-radius:4px;padding:1px 5px;margin-left:4px">modifié</span>` : ""}
+            </label>
+            <span id="cfg-val-${p.key}"
+                  style="font-size:.85rem;font-weight:700;color:#6366F1;min-width:55px;text-align:right">
+              ${val}${p.unit}
+            </span>
+          </div>
+          <input type="range" id="cfg-${p.key}"
+                 min="${p.min}" max="${p.max}" step="${p.step}" value="${val}"
+                 class="form-range" style="accent-color:#6366F1"
+                 oninput="document.getElementById('cfg-val-${p.key}').textContent=this.value+'${p.unit}'; _cfg['${p.key}']=parseFloat(this.value)">
+          <p style="font-size:.68rem;color:var(--sde-muted);margin:2px 0 0">
+            ${p.desc}
+            <span style="color:var(--sde-muted);font-size:.65rem"> Défaut : ${defaults[p.key]}${p.unit}</span>
+          </p>
+        </div>`;
+    }).join("");
+  }
+
+  function loadConfig() {
+    fetch("/admin/advisor-config")
+      .then(r => r.json())
+      .then(data => {
+        if (data.ok) renderConfig(data.config, data.defaults);
+      });
+  }
+
+  window.saveConfig = function () {
+    const CSRF = document.querySelector('meta[name="csrf-token"]').content;
+    fetch("/admin/advisor-config", {
+      method: "POST",
+      headers: {"Content-Type":"application/json","X-CSRFToken":CSRF},
+      body: JSON.stringify(_cfg),
+    })
+    .then(r => r.json())
+    .then(data => {
+      const fb = document.getElementById("sde-config-feedback");
+      if (data.ok) {
+        renderConfig(data.config, _defaults);
+        fb.textContent = "✓ Configuration enregistrée.";
+        fb.className = "small mt-2 text-success";
+      } else {
+        fb.textContent = data.error || "Erreur.";
+        fb.className = "small mt-2 text-danger";
+      }
+      fb.classList.remove("d-none");
+      setTimeout(() => fb.classList.add("d-none"), 3000);
+    });
+  };
+
+  window.resetConfig = function () {
+    if (!confirm("Remettre toutes les valeurs par défaut ?")) return;
+    const CSRF = document.querySelector('meta[name="csrf-token"]').content;
+    fetch("/admin/advisor-config", {
+      method: "POST",
+      headers: {"Content-Type":"application/json","X-CSRFToken":CSRF},
+      body: JSON.stringify({reset: true}),
+    })
+    .then(r => r.json())
+    .then(data => {
+      if (data.ok) renderConfig(data.config, _defaults);
+    });
+  };
+
+  document.addEventListener("DOMContentLoaded", loadConfig);
+
   document.addEventListener("DOMContentLoaded", () => {
     loadStats(false);
 

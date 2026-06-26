@@ -103,6 +103,7 @@ ALTER TABLE positions         ENABLE ROW LEVEL SECURITY;
 ALTER TABLE daily_advice      ENABLE ROW LEVEL SECURITY;
 ALTER TABLE position_targets    ENABLE ROW LEVEL SECURITY;
 ALTER TABLE portfolio_snapshots ENABLE ROW LEVEL SECURITY;
+ALTER TABLE advisor_config      ENABLE ROW LEVEL SECURITY;
 ```
 
 Aucune policy supplémentaire n'est nécessaire : l'app accède toujours via `service_role` (bypass RLS).
@@ -110,6 +111,25 @@ Aucune policy supplémentaire n'est nécessaire : l'app accède toujours via `se
 ---
 
 ## Migrations sur une installation existante
+
+**Table `advisor_config`** (seuils de conseil configurables — à créer si absente) :
+
+```sql
+CREATE TABLE IF NOT EXISTS advisor_config (
+  username        TEXT PRIMARY KEY,
+  stop_loss_pct   FLOAT DEFAULT -20,
+  take_profit_pct FLOAT DEFAULT 15,
+  score_acheter   FLOAT DEFAULT 60,
+  score_vendre    FLOAT DEFAULT 38,
+  rsi_renforcer   FLOAT DEFAULT 42,
+  pnl_renforcer   FLOAT DEFAULT -5,
+  score_tenir     FLOAT DEFAULT 62,
+  var_tenir_eval  FLOAT DEFAULT 3,
+  updated_at      TIMESTAMPTZ DEFAULT now()
+);
+
+ALTER TABLE advisor_config ENABLE ROW LEVEL SECURITY;
+```
 
 **Table `portfolio_snapshots`** (historique de valeur du portefeuille — à créer si absente) :
 

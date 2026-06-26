@@ -1,7 +1,7 @@
 # flask_app/blueprints/admin.py — Dashboard admin pertinence des conseils
 
 import os
-from flask import Blueprint, render_template, jsonify, abort
+from flask import Blueprint, render_template, jsonify, request, abort
 from flask_login import current_user, login_required
 
 bp = Blueprint("admin", __name__, url_prefix="/admin")
@@ -21,6 +21,32 @@ def _require_admin():
 def dashboard():
     _require_admin()
     return render_template("admin.html")
+
+
+@bp.route("/advisor-config", methods=["GET"])
+@login_required
+def get_advisor_config():
+    _require_admin()
+    from portfolio.config_advisor import get_config, DEFAULTS
+    cfg = get_config(current_user.id)
+    return jsonify({"ok": True, "config": cfg, "defaults": DEFAULTS})
+
+
+@bp.route("/advisor-config", methods=["POST"])
+@login_required
+def save_advisor_config():
+    _require_admin()
+    data = request.get_json(silent=True) or {}
+    try:
+        from portfolio.config_advisor import save_config, reset_config
+        if data.get("reset"):
+            reset_config(current_user.id)
+            from portfolio.config_advisor import DEFAULTS
+            return jsonify({"ok": True, "config": DEFAULTS})
+        cfg = save_config(current_user.id, data)
+        return jsonify({"ok": True, "config": cfg})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
 
 
 @bp.route("/stats")

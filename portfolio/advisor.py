@@ -20,7 +20,8 @@ ACTION_LABELS = {
 # ── Génération du conseil ─────────────────────────────────────────────────────
 
 def generate_advice(summary: dict | None, market: dict, snapshot: dict,
-                    candle_info: dict | None = None) -> dict:
+                    candle_info: dict | None = None,
+                    cfg: dict | None = None) -> dict:
     """
     Génère un conseil structuré à partir de la position et de l'analyse SDE.
 
@@ -28,7 +29,11 @@ def generate_advice(summary: dict | None, market: dict, snapshot: dict,
     market      : dict market avec price, rsi, var_1d
     snapshot    : dict pipeline avec score_global, recommandation, etc.
     candle_info : dict optionnel {signal, pattern, description} depuis detect_patterns()
+    cfg         : seuils configurables (get_config(username)) — valeurs par défaut si None
     """
+    from portfolio.config_advisor import DEFAULTS
+    c = {**DEFAULTS, **(cfg or {})}
+
     score  = float(snapshot.get("score_global", 50))
     reco   = snapshot.get("recommandation", "NEUTRE")
     rsi    = float(market.get("rsi") or 50)
@@ -36,7 +41,7 @@ def generate_advice(summary: dict | None, market: dict, snapshot: dict,
 
     # ── Cas 1 : pas de position ───────────────────────────────────────────────
     if summary is None:
-        if reco == "ACHETER" and score >= 60:
+        if reco == "ACHETER" and score >= c["score_acheter"]:
             base = _conseil("ACHETER", None, prix,
                 f"Pas de position. Signal SDE haussier ({score:.0f}/100, RSI {rsi:.0f}). "
                 f"Opportunité d'entrée autour de {prix:.2f} $.")
@@ -53,14 +58,14 @@ def generate_advice(summary: dict | None, market: dict, snapshot: dict,
     cout_moyen   = float(summary["cout_moyen"])
 
     # Stop loss automatique
-    if pnl_pct <= -20:
+    if pnl_pct <= c["stop_loss_pct"]:
         base = _conseil("VENDRE", total_shares, prix,
             f"Stop loss atteint : position à {pnl_pct:+.1f}% (coût moyen {cout_moyen:.2f} $). "
             f"Limitation des pertes recommandée.")
         return _with_candle(base, candle_info, pnl_pct, score, reco)
 
     # Prise de bénéfices sur signal vendeur fort
-    if pnl_pct >= 15 and reco == "VENDRE":
+    if pnl_pct >= c["take_profit_pct"] and reco == "VENDRE":
         alleger = max(1, round(total_shares * 0.5))
         base = _conseil("ALLÉGER", alleger, prix,
             f"Plus-value de {pnl_pct:+.1f}% + signal SDE baissier ({score:.0f}/100). "
@@ -68,14 +73,14 @@ def generate_advice(summary: dict | None, market: dict, snapshot: dict,
         return _with_candle(base, candle_info, pnl_pct, score, reco)
 
     # Signal vendeur fort sans plus-value importante
-    if reco == "VENDRE" and score <= 38:
+    if reco == "VENDRE" and score <= c["score_vendre"]:
         base = _conseil("VENDRE", total_shares, prix,
             f"Signal SDE baissier fort ({score:.0f}/100, RSI {rsi:.0f}). "
             f"Sortie de position recommandée (P&L actuelle : {pnl_pct:+.1f}%).")
         return _with_candle(base, candle_info, pnl_pct, score, reco)
 
     # Renforcement sur faiblesse
-    if pnl_pct <= -5 and reco == "ACHETER" and rsi <= 42:
+    if pnl_pct <= c["pnl_renforcer"] and reco == "ACHETER" and rsi <= c["rsi_renforcer"]:
         renforcer = max(1, round(total_shares * 0.25))
         base = _conseil("RENFORCER", renforcer, prix,
             f"RSI bas ({rsi:.0f}) + signal SDE haussier ({score:.0f}/100). "
@@ -83,7 +88,7 @@ def generate_advice(summary: dict | None, market: dict, snapshot: dict,
         return _with_candle(base, candle_info, pnl_pct, score, reco, total_shares, prix)
 
     # Signal haussier confirmé en territoire positif
-    if reco == "ACHETER" and score >= 62 and pnl_pct > 0:
+    if reco == "ACHETER" and score >= c["score_tenir"] and pnl_pct > 0:
         base = _conseil("TENIR", None, None,
             f"Signal SDE haussier ({score:.0f}/100) avec position en positif ({pnl_pct:+.1f}%). "
             f"Maintien recommandé, la tendance reste favorable.")
@@ -304,14 +309,18 @@ def evaluate_yesterday_advice(username: str, ticker: str, current_price: float):
         action       = row.get("action", "")
         variation_j1 = round((current_price - prix_hier) / prix_hier * 100, 2) if prix_hier else 0
 
+        # Seuil TENIR depuis la config utilisateur
+        from portfolio.config_advisor import get_config as _get_cfg
+        var_tenir = _get_cfg(username).get("var_tenir_eval", 3.0)
+
         # Le conseil était-il bon ?
         bon = None
         if action in ("ACHETER", "RENFORCER"):
-            bon = variation_j1 > 0   # bon si prix a monté
+            bon = variation_j1 > 0
         elif action in ("VENDRE", "ALLÉGER"):
-            bon = variation_j1 < 0   # bon si prix a baissé
-        elif action == "TENIR":
-            bon = abs(variation_j1) < 3  # bon si stable (< 3%)
+            bon = variation_j1 < 0
+        elif action in ("TENIR", "SURVEILLER"):
+            bon = abs(variation_j1) < var_tenir
 
         update_one(
             _TABLE,
