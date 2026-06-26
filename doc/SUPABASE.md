@@ -101,7 +101,8 @@ ALTER TABLE scores            ENABLE ROW LEVEL SECURITY;
 ALTER TABLE ticker_snapshots  ENABLE ROW LEVEL SECURITY;
 ALTER TABLE positions         ENABLE ROW LEVEL SECURITY;
 ALTER TABLE daily_advice      ENABLE ROW LEVEL SECURITY;
-ALTER TABLE position_targets  ENABLE ROW LEVEL SECURITY;
+ALTER TABLE position_targets    ENABLE ROW LEVEL SECURITY;
+ALTER TABLE portfolio_snapshots ENABLE ROW LEVEL SECURITY;
 ```
 
 Aucune policy supplémentaire n'est nécessaire : l'app accède toujours via `service_role` (bypass RLS).
@@ -109,6 +110,25 @@ Aucune policy supplémentaire n'est nécessaire : l'app accède toujours via `se
 ---
 
 ## Migrations sur une installation existante
+
+**Table `portfolio_snapshots`** (historique de valeur du portefeuille — à créer si absente) :
+
+```sql
+CREATE TABLE IF NOT EXISTS portfolio_snapshots (
+  id             BIGSERIAL PRIMARY KEY,
+  username       TEXT NOT NULL,
+  snapshot_date  DATE NOT NULL,
+  currency       TEXT NOT NULL DEFAULT 'USD',
+  portfolio_val  FLOAT NOT NULL DEFAULT 0,
+  cash_dispo     FLOAT NOT NULL DEFAULT 0,
+  total_compte   FLOAT NOT NULL DEFAULT 0,
+  pnl_cumul      FLOAT NOT NULL DEFAULT 0,
+  created_at     TIMESTAMPTZ DEFAULT now(),
+  UNIQUE(username, snapshot_date, currency)
+);
+
+ALTER TABLE portfolio_snapshots ENABLE ROW LEVEL SECURITY;
+```
 
 **Table `position_targets`** (Take Profit / Stop Loss — à créer si absente) :
 

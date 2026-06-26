@@ -183,10 +183,36 @@ def get_overview():
             except Exception as e:
                 print(f"[Overview] {ticker} erreur : {e}", flush=True)
 
+        # Snapshot quotidien après clôture NASDAQ (22h Paris, une fois par jour)
+        try:
+            from portfolio.history import (save_daily_snapshot,
+                                           snapshot_exists_today,
+                                           _market_closed_today)
+            if result and _market_closed_today() and not snapshot_exists_today(current_user.id):
+                save_daily_snapshot(current_user.id, result)
+        except Exception:
+            pass
+
         resp = jsonify({"ok": True, "positions": result, "labels": ACTION_LABELS})
         resp.headers["Cache-Control"] = "no-store"
         return resp
 
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+
+# ── Historique portefeuille ───────────────────────────────────────────────────
+
+@bp.route("/history")
+@login_required
+def get_history():
+    """Retourne les snapshots quotidiens pour le graphe historique."""
+    days = request.args.get("days", 90, type=int)
+    days = min(max(days, 7), 365)
+    try:
+        from portfolio.history import get_history as _get
+        rows = _get(current_user.id, days)
+        return jsonify({"ok": True, "history": rows})
     except Exception as e:
         return jsonify({"ok": False, "error": str(e)}), 500
 

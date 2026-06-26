@@ -1,6 +1,10 @@
 {% extends "base.html" %}
 {% block title %}SDE — Mes positions{% endblock %}
 
+{% block head %}
+<script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+{% endblock %}
+
 {% block content %}
 
 <div class="sde-ticker-header mb-3">
@@ -18,6 +22,27 @@
     <i class="bi bi-arrow-clockwise me-1"></i>
     <span class="hide-xs">Actualiser</span>
   </button>
+</div>
+
+<!-- Graphe historique portefeuille -->
+<div class="sde-card mb-3" id="sde-history-card" style="display:none">
+  <div class="d-flex align-items-center justify-content-between mb-2 flex-wrap gap-2">
+    <span class="sde-section-title mb-0" style="font-size:.8rem">
+      <i class="bi bi-graph-up me-1"></i>Évolution du portefeuille
+    </span>
+    <div class="d-flex gap-1">
+      <button onclick="loadHistory(30)"  id="hist-btn-30"
+              class="sde-nav-btn" style="font-size:.72rem;padding:3px 10px">30j</button>
+      <button onclick="loadHistory(90)"  id="hist-btn-90"
+              class="sde-nav-btn" style="font-size:.72rem;padding:3px 10px">90j</button>
+      <button onclick="loadHistory(365)" id="hist-btn-365"
+              class="sde-nav-btn" style="font-size:.72rem;padding:3px 10px">1 an</button>
+    </div>
+  </div>
+  <div id="sde-history-plot" style="height:220px"></div>
+  <p id="sde-history-note" class="text-muted" style="font-size:.68rem;margin:4px 0 0;display:none">
+    Snapshot enregistré chaque soir après la clôture du NASDAQ (22h00 Paris).
+  </p>
 </div>
 
 <div id="sde-overview-wrap">
@@ -606,6 +631,96 @@
   window.deletePos     = deletePos;
 
   document.addEventListener("DOMContentLoaded", loadOverview);
+})();
+
+/* ── Graphe historique portefeuille ──────────────────────────────────────── */
+(function () {
+  let _currentDays = 90;
+
+  function _setActiveBtn(days) {
+    [30, 90, 365].forEach(d => {
+      const btn = document.getElementById("hist-btn-" + d);
+      if (btn) btn.style.fontWeight = d === days ? "700" : "";
+    });
+  }
+
+  window.loadHistory = function (days) {
+    days = days || _currentDays;
+    _currentDays = days;
+    _setActiveBtn(days);
+
+    fetch(`/portfolio/history?days=${days}`)
+      .then(r => r.json())
+      .then(data => {
+        const card = document.getElementById("sde-history-card");
+        if (!data.ok || !data.history || data.history.length < 2) {
+          // Pas encore assez de données — garder la carte cachée
+          return;
+        }
+        card.style.display = "";
+        document.getElementById("sde-history-note").style.display = "";
+
+        // Regrouper par devise
+        const byCur = {};
+        data.history.forEach(r => {
+          const cur = r.currency || "USD";
+          (byCur[cur] = byCur[cur] || []).push(r);
+        });
+
+        const SYM_MAP = {USD:"$",EUR:"€",GBP:"£",CHF:"Fr",CAD:"CA$",AUD:"A$"};
+        const COLORS  = ["#6366F1","#1D9E75","#D85A30","#F59E0B"];
+        const traces  = [];
+        let ci = 0;
+
+        Object.entries(byCur).forEach(([cur, rows]) => {
+          const sym   = SYM_MAP[cur] || cur;
+          const color = COLORS[ci++ % COLORS.length];
+          const dates = rows.map(r => r.snapshot_date);
+          const vals  = rows.map(r => r.total_compte);
+          const ptxt  = rows.map(r =>
+            `${r.snapshot_date}<br>` +
+            `Total : <b>${sym}${r.total_compte.toFixed(2)}</b><br>` +
+            `Portefeuille : ${sym}${r.portfolio_val.toFixed(2)}<br>` +
+            `Cash dispo. : ${sym}${r.cash_dispo.toFixed(2)}<br>` +
+            `P&L cumulé : ${r.pnl_cumul >= 0 ? "+" : ""}${sym}${r.pnl_cumul.toFixed(2)}`
+          );
+          traces.push({
+            x: dates, y: vals,
+            type: "scatter", mode: "lines+markers",
+            name: `Total ${cur}`,
+            line: {color, width: 2},
+            marker: {size: 5, color},
+            hovertemplate: "%{customdata}<extra></extra>",
+            customdata: ptxt,
+          });
+        });
+
+        Plotly.react("sde-history-plot", traces, {
+          template: "plotly_dark",
+          paper_bgcolor: "transparent",
+          plot_bgcolor:  "transparent",
+          margin: {l:48, r:10, t:10, b:36},
+          height: 220,
+          showlegend: Object.keys(byCur).length > 1,
+          legend: {orientation:"h", y:1.1, x:0, font:{size:11}},
+          xaxis: {
+            showgrid: false,
+            tickfont: {size:10},
+            tickformat: "%d/%m",
+          },
+          yaxis: {
+            showgrid: true,
+            gridcolor: "rgba(255,255,255,.07)",
+            tickfont: {size:10},
+            tickformat: ",.0f",
+          },
+          hovermode: "x unified",
+        }, {responsive: true, displayModeBar: false});
+      })
+      .catch(() => {});
+  };
+
+  document.addEventListener("DOMContentLoaded", () => window.loadHistory(90));
 })();
 </script>
 {% endblock %}
