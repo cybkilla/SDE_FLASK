@@ -1,0 +1,570 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SDE — Présentation</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Segoe UI', Arial, sans-serif;
+    background: #0f172a;
+    color: #1E3A5F;
+    height: 100vh;
+    overflow: hidden;
+  }
+
+  .deck {
+    width: 100vw;
+    height: 100vh;
+    position: relative;
+  }
+
+  .slide {
+    display: none;
+    width: 100%;
+    height: 100%;
+    position: absolute;
+    top: 0; left: 0;
+    padding: 56px 72px;
+    animation: fadeIn .35s ease;
+  }
+  .slide.active { display: flex; flex-direction: column; justify-content: center; }
+
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+  /* ── Couleurs de fond par slide ───────── */
+  .bg-navy   { background: #1E3A5F; color: #F0F4F8; }
+  .bg-light  { background: #F0F4F8; }
+  .bg-teal   { background: #1D9E75; color: #fff; }
+  .bg-white  { background: #ffffff; }
+  .bg-indigo { background: #6366F1; color: #fff; }
+
+  /* ── Typographie ───────── */
+  .eyebrow {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    opacity: .6;
+    margin-bottom: 16px;
+  }
+
+  h1 { font-size: 52px; font-weight: 800; line-height: 1.1; margin-bottom: 20px; }
+  h2 { font-size: 36px; font-weight: 800; line-height: 1.15; margin-bottom: 16px; }
+  h3 { font-size: 20px; font-weight: 700; margin-bottom: 8px; }
+
+  .subtitle { font-size: 20px; opacity: .8; line-height: 1.5; max-width: 560px; }
+  .lead     { font-size: 18px; line-height: 1.7; max-width: 640px; }
+
+  /* ── Composants ───────── */
+  .tag {
+    display: inline-block;
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 700;
+    margin-bottom: 24px;
+  }
+  .tag-teal   { background: #1D9E75; color: #fff; }
+  .tag-navy   { background: #1E3A5F; color: #fff; }
+  .tag-indigo { background: #6366F1; color: #fff; }
+  .tag-amber  { background: #BA7517; color: #fff; }
+
+  .cards {
+    display: grid;
+    gap: 20px;
+    margin-top: 24px;
+  }
+  .cards-3 { grid-template-columns: repeat(3, 1fr); }
+  .cards-2 { grid-template-columns: repeat(2, 1fr); }
+
+  .card {
+    background: #fff;
+    border-radius: 12px;
+    padding: 24px;
+    box-shadow: 0 2px 12px rgba(0,0,0,.08);
+  }
+  .card-dark {
+    background: rgba(255,255,255,.12);
+    border-radius: 12px;
+    padding: 24px;
+    border: 1px solid rgba(255,255,255,.2);
+    color: #fff;
+  }
+
+  .card-icon {
+    font-size: 28px;
+    margin-bottom: 10px;
+  }
+
+  .pill {
+    display: inline-block;
+    padding: 6px 16px;
+    border-radius: 20px;
+    font-size: 14px;
+    font-weight: 700;
+    margin: 4px;
+  }
+
+  .divider {
+    width: 56px;
+    height: 4px;
+    border-radius: 2px;
+    background: #1D9E75;
+    margin: 20px 0;
+  }
+  .divider-white { background: rgba(255,255,255,.5); }
+
+  .two-col {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 56px;
+    align-items: center;
+  }
+
+  .check-list { list-style: none; margin-top: 12px; }
+  .check-list li {
+    padding: 8px 0;
+    border-bottom: 1px solid rgba(0,0,0,.06);
+    font-size: 16px;
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+  }
+  .check-list li::before { content: "✓"; color: #1D9E75; font-weight: 800; flex-shrink: 0; }
+  .check-list-white li { border-color: rgba(255,255,255,.15); }
+  .check-list-white li::before { color: rgba(255,255,255,.8); }
+
+  .score-demo {
+    background: #1E3A5F;
+    color: #fff;
+    border-radius: 16px;
+    padding: 28px 32px;
+    text-align: center;
+  }
+  .score-number { font-size: 64px; font-weight: 900; color: #1D9E75; line-height: 1; }
+  .score-label  { font-size: 13px; opacity: .6; margin-top: 6px; letter-spacing: .05em; }
+
+  .action-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 18px;
+    border-radius: 8px;
+    font-size: 15px;
+    font-weight: 700;
+    margin-top: 12px;
+  }
+
+  /* ── Navigation ───────── */
+  .nav {
+    position: fixed;
+    bottom: 28px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    background: rgba(15,23,42,.85);
+    backdrop-filter: blur(8px);
+    border-radius: 40px;
+    padding: 10px 20px;
+    z-index: 100;
+  }
+
+  .nav-btn {
+    background: none;
+    border: none;
+    color: #94a3b8;
+    font-size: 18px;
+    cursor: pointer;
+    padding: 4px 10px;
+    border-radius: 20px;
+    transition: all .2s;
+  }
+  .nav-btn:hover { color: #fff; background: rgba(255,255,255,.1); }
+
+  .nav-dots { display: flex; gap: 6px; }
+  .nav-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: #475569;
+    cursor: pointer;
+    transition: all .2s;
+    border: none;
+  }
+  .nav-dot.active { background: #1D9E75; width: 22px; border-radius: 4px; }
+
+  .slide-num {
+    color: #64748b;
+    font-size: 12px;
+    font-weight: 600;
+    min-width: 36px;
+    text-align: center;
+  }
+
+  /* ── Slide 1 spécifique ───────── */
+  .logo-big {
+    font-size: 72px;
+    font-weight: 900;
+    color: #1D9E75;
+    letter-spacing: -2px;
+    line-height: 1;
+  }
+  .logo-tagline {
+    font-size: 15px;
+    color: rgba(255,255,255,.4);
+    letter-spacing: .2em;
+    text-transform: uppercase;
+    margin-top: 4px;
+  }
+
+  /* ── Slide stats ───────── */
+  .stat-row { display: flex; gap: 40px; margin-top: 24px; }
+  .stat { text-align: left; }
+  .stat-num { font-size: 42px; font-weight: 900; color: #1D9E75; line-height: 1; }
+  .stat-label { font-size: 13px; opacity: .6; margin-top: 4px; }
+
+  /* ── Responsive ───────── */
+  @media (max-width: 768px) {
+    .slide { padding: 32px 24px; }
+    h1 { font-size: 34px; }
+    h2 { font-size: 26px; }
+    .cards-3 { grid-template-columns: 1fr; }
+    .cards-2 { grid-template-columns: 1fr; }
+    .two-col  { grid-template-columns: 1fr; gap: 24px; }
+    .stat-row { flex-wrap: wrap; gap: 20px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="deck">
+
+  <!-- ══ SLIDE 1 — Couverture ════════════════════════════════════════ -->
+  <div class="slide bg-navy active">
+    <div>
+      <div class="logo-big">SDE</div>
+      <div class="logo-tagline">Stock Decision Engine</div>
+      <div class="divider" style="margin-top:28px"></div>
+      <h1 style="font-size:38px;max-width:520px;margin-top:8px">
+        Votre assistant<br>personnel pour investir<br>en bourse
+      </h1>
+      <p class="subtitle" style="margin-top:16px">
+        Un outil simple et transparent qui analyse vos actions,<br>
+        suit votre portefeuille et vous guide chaque jour.
+      </p>
+      <div style="margin-top:40px;display:flex;gap:12px;flex-wrap:wrap">
+        <span class="pill" style="background:#1D9E75;color:#fff">Analyse</span>
+        <span class="pill" style="background:rgba(255,255,255,.12);color:#fff">Conseils</span>
+        <span class="pill" style="background:rgba(255,255,255,.12);color:#fff">Portefeuille</span>
+        <span class="pill" style="background:rgba(255,255,255,.12);color:#fff">Alertes</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ SLIDE 2 — Le problème ════════════════════════════════════════ -->
+  <div class="slide bg-light">
+    <div class="eyebrow" style="color:#1E3A5F">Le constat</div>
+    <h2>Investir en bourse, c'est souvent…</h2>
+    <div class="divider"></div>
+    <div class="cards cards-3" style="margin-top:8px">
+      <div class="card">
+        <div class="card-icon">📰</div>
+        <h3 style="color:#1E3A5F">Trop d'informations</h3>
+        <p style="font-size:14px;color:#64748b;margin-top:6px;line-height:1.6">
+          Actualités, indicateurs techniques, analyses contradictoires…
+          difficile de savoir quoi regarder.
+        </p>
+      </div>
+      <div class="card">
+        <div class="card-icon">😰</div>
+        <h3 style="color:#1E3A5F">Des décisions sous pression</h3>
+        <p style="font-size:14px;color:#64748b;margin-top:6px;line-height:1.6">
+          Acheter ? Attendre ? Vendre ? Sans cadre clair,
+          l'émotion prend le dessus.
+        </p>
+      </div>
+      <div class="card">
+        <div class="card-icon">🔍</div>
+        <h3 style="color:#1E3A5F">Suivi éparpillé</h3>
+        <p style="font-size:14px;color:#64748b;margin-top:6px;line-height:1.6">
+          Spreadsheets, applis multiples, notifications en vrac…
+          pas de vue d'ensemble claire.
+        </p>
+      </div>
+    </div>
+    <p class="lead" style="margin-top:32px;color:#1E3A5F">
+      SDE centralise tout ça en un seul endroit, avec un langage simple :
+      <strong>que faire aujourd'hui avec cette action ?</strong>
+    </p>
+  </div>
+
+  <!-- ══ SLIDE 3 — Ce qu'est SDE ════════════════════════════════════════ -->
+  <div class="slide bg-teal">
+    <div class="eyebrow">Ce que fait SDE</div>
+    <h2 style="max-width:560px">Une application web qui analyse et conseille, pas qui trade</h2>
+    <div class="divider divider-white"></div>
+    <div class="two-col">
+      <ul class="check-list check-list-white">
+        <li>Suit votre liste d'actions personnalisée</li>
+        <li>Calcule un score de santé pour chaque ticker (0–100)</li>
+        <li>Génère un conseil quotidien clair : Acheter, Tenir, Vendre…</li>
+        <li>Suit votre portefeuille et calcule vos gains/pertes en temps réel</li>
+        <li>Envoie des alertes email si quelque chose mérite votre attention</li>
+        <li>Produit un rapport hebdomadaire automatique</li>
+      </ul>
+      <div>
+        <div class="score-demo">
+          <div style="font-size:13px;opacity:.5;margin-bottom:12px;letter-spacing:.05em">SCORE SDE · NVIDIA</div>
+          <div class="score-number">74</div>
+          <div class="score-label">HAUSSIER / 100</div>
+          <div class="action-badge" style="background:#1D9E75;color:#fff;margin:0 auto;margin-top:18px">
+            ↑ Acheter
+          </div>
+        </div>
+        <p style="font-size:12px;opacity:.6;margin-top:12px;text-align:center">
+          Exemple de score et conseil générés par SDE
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ SLIDE 4 — L'analyse ════════════════════════════════════════ -->
+  <div class="slide bg-white">
+    <div class="eyebrow" style="color:#6366F1">Fonctionnalité 1</div>
+    <h2 style="color:#1E3A5F">Une analyse complète en un coup d'œil</h2>
+    <div class="divider" style="background:#6366F1"></div>
+    <p class="lead" style="color:#475569;margin-bottom:24px">
+      SDE combine plusieurs sources pour donner un avis équilibré, sans jargon inutile.
+    </p>
+    <div class="cards cards-2">
+      <div class="card" style="border-left:4px solid #1D9E75">
+        <h3 style="color:#1E3A5F">Signaux techniques</h3>
+        <p style="font-size:14px;color:#64748b;margin-top:6px;line-height:1.6">
+          Momentum, RSI, tendance, patterns graphiques (chandelier japonais) —
+          traduits en langage simple.
+        </p>
+      </div>
+      <div class="card" style="border-left:4px solid #6366F1">
+        <h3 style="color:#1E3A5F">Actualités &amp; sentiment</h3>
+        <p style="font-size:14px;color:#64748b;margin-top:6px;line-height:1.6">
+          Analyse de la presse financière récente — positif, négatif ou neutre —
+          pour contextualiser le signal technique.
+        </p>
+      </div>
+      <div class="card" style="border-left:4px solid #BA7517">
+        <h3 style="color:#1E3A5F">Fondamentaux</h3>
+        <p style="font-size:14px;color:#64748b;margin-top:6px;line-height:1.6">
+          P/E ratio, croissance du chiffre d'affaires, marges —
+          pour ne pas acheter une action surévaluée.
+        </p>
+      </div>
+      <div class="card" style="border-left:4px solid #1E3A5F">
+        <h3 style="color:#1E3A5F">Score global SDE</h3>
+        <p style="font-size:14px;color:#64748b;margin-top:6px;line-height:1.6">
+          Un seul chiffre synthétique (0–100) qui agrège tous les signaux
+          avec leur poids respectif.
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ SLIDE 5 — Les conseils ════════════════════════════════════════ -->
+  <div class="slide bg-navy">
+    <div class="eyebrow">Fonctionnalité 2</div>
+    <h2 style="max-width:560px">Un conseil quotidien, clair et expliqué</h2>
+    <div class="divider"></div>
+    <p class="subtitle" style="margin-bottom:28px">
+      SDE ne dit pas juste "c'est bien" — il donne un avis concret
+      adapté à votre situation (position ouverte ou non, plus-value latente…).
+    </p>
+    <div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:28px">
+      <span class="action-badge" style="background:#1D9E75;color:#fff">↑ Acheter</span>
+      <span class="action-badge" style="background:#15803d;color:#fff">↗ Renforcer</span>
+      <span class="action-badge" style="background:#BA7517;color:#fff">◆ Tenir</span>
+      <span class="action-badge" style="background:#5a6a7a;color:#fff">◎ Surveiller</span>
+      <span class="action-badge" style="background:#D85A30;color:#fff">↘ Alléger</span>
+      <span class="action-badge" style="background:#991b1b;color:#fff">↓ Vendre</span>
+    </div>
+    <div class="card-dark" style="max-width:520px">
+      <p style="font-size:13px;opacity:.6;margin-bottom:8px">EXEMPLE DE RAISONNEMENT SDE</p>
+      <p style="font-size:15px;line-height:1.7">
+        "RSI bas (38) + signal SDE haussier (67/100). Opportunité de renforcement
+        sur faiblesse (−4.2% de latence). Confirmé par un signal chandelier haussier
+        <em>Marteau</em>."
+      </p>
+    </div>
+    <p style="font-size:13px;opacity:.45;margin-top:20px">
+      Chaque conseil est expliqué — vous comprenez pourquoi, pas seulement quoi faire.
+    </p>
+  </div>
+
+  <!-- ══ SLIDE 6 — Portefeuille & alertes ════════════════════════════════════════ -->
+  <div class="slide bg-light">
+    <div class="eyebrow" style="color:#1E3A5F">Fonctionnalités 3 &amp; 4</div>
+    <h2>Suivre et protéger votre portefeuille</h2>
+    <div class="divider"></div>
+    <div class="two-col">
+      <div>
+        <h3 style="color:#1E3A5F;margin-bottom:16px">Suivi du portefeuille</h3>
+        <ul class="check-list">
+          <li>Ajout de positions (achat, vente ou import d'existant)</li>
+          <li>P&amp;L en temps réel par action et au global</li>
+          <li>Coût moyen et historique des lots</li>
+          <li>Graphique d'évolution du compte sur 30j / 90j / 1 an</li>
+        </ul>
+        <h3 style="color:#1E3A5F;margin-top:28px;margin-bottom:16px">Alertes intelligentes</h3>
+        <ul class="check-list">
+          <li>Email si la recommandation SDE change</li>
+          <li>Email si le cours varie fortement (±5 % par défaut)</li>
+          <li>Take Profit / Stop Loss personnalisés par position</li>
+          <li>Rapport hebdomadaire automatique le dimanche soir</li>
+        </ul>
+      </div>
+      <div>
+        <div class="card" style="background:#1E3A5F;color:#fff;padding:28px">
+          <p style="font-size:12px;opacity:.4;letter-spacing:.08em;margin-bottom:16px">RAPPORT HEBDO · EXEMPLE</p>
+          <div style="display:flex;justify-content:space-between;margin-bottom:12px">
+            <span style="opacity:.6;font-size:13px">Portefeuille</span>
+            <span style="font-weight:700">$12 450</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;margin-bottom:12px">
+            <span style="opacity:.6;font-size:13px">P&amp;L global</span>
+            <span style="font-weight:700;color:#1D9E75">+$1 230</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;margin-bottom:20px">
+            <span style="opacity:.6;font-size:13px">Pertinence conseils</span>
+            <span style="font-weight:700;color:#1D9E75">68%</span>
+          </div>
+          <div style="height:1px;background:rgba(255,255,255,.1);margin-bottom:16px"></div>
+          <div style="font-size:12px;opacity:.5">3 tickers · 2 alertes cette semaine</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ SLIDE 7 — Pour qui ════════════════════════════════════════ -->
+  <div class="slide bg-indigo">
+    <div class="eyebrow">Profil utilisateur</div>
+    <h2 style="max-width:540px">SDE s'adresse aux investisseurs particuliers actifs</h2>
+    <div class="divider divider-white"></div>
+    <div class="cards cards-3" style="margin-top:8px">
+      <div class="card-dark">
+        <div class="card-icon">📈</div>
+        <h3>Vous suivez des actions</h3>
+        <p style="font-size:13px;opacity:.75;margin-top:6px;line-height:1.6">
+          Vous avez déjà un compte bourse et quelques lignes. SDE vous aide
+          à prendre de meilleures décisions sur ces positions.
+        </p>
+      </div>
+      <div class="card-dark">
+        <div class="card-icon">⏱️</div>
+        <h3>Vous manquez de temps</h3>
+        <p style="font-size:13px;opacity:.75;margin-top:6px;line-height:1.6">
+          Pas besoin de surveiller les marchés toute la journée.
+          SDE vous alerte quand quelque chose mérite votre attention.
+        </p>
+      </div>
+      <div class="card-dark">
+        <div class="card-icon">🧠</div>
+        <h3>Vous voulez comprendre</h3>
+        <p style="font-size:13px;opacity:.75;margin-top:6px;line-height:1.6">
+          Chaque conseil est expliqué. SDE ne se substitue pas
+          à votre jugement — il l'éclaire.
+        </p>
+      </div>
+    </div>
+    <div style="margin-top:28px;padding:16px 20px;background:rgba(255,255,255,.1);border-radius:10px;font-size:14px;max-width:600px">
+      ⚠️ <strong>Important :</strong> SDE est un outil d'aide à la décision, pas un conseiller financier agréé.
+      Les investissements comportent des risques. SDE ne garantit aucun résultat.
+    </div>
+  </div>
+
+  <!-- ══ SLIDE 8 — Conclusion ════════════════════════════════════════ -->
+  <div class="slide bg-navy">
+    <div class="eyebrow">La suite</div>
+    <h2 style="max-width:540px">SDE est en développement actif</h2>
+    <div class="divider"></div>
+    <div class="two-col">
+      <div>
+        <p class="lead" style="margin-bottom:28px">
+          L'outil tourne en production et s'améliore continuellement.
+          Vos retours ont une vraie valeur pour façonner les prochaines fonctionnalités.
+        </p>
+        <ul class="check-list check-list-white">
+          <li>Interface web — accessible depuis n'importe quel appareil</li>
+          <li>NASDAQ &amp; NYSE — actions américaines uniquement pour l'instant</li>
+          <li>Gratuit pour les utilisateurs invités (phase test)</li>
+          <li>Données en temps réel via des APIs financières professionnelles</li>
+        </ul>
+      </div>
+      <div>
+        <div class="stat-row" style="flex-direction:column;gap:20px">
+          <div class="stat">
+            <div class="stat-num">6</div>
+            <div class="stat-label" style="color:rgba(255,255,255,.5)">niveaux de conseil distincts</div>
+          </div>
+          <div class="stat">
+            <div class="stat-num">24/7</div>
+            <div class="stat-label" style="color:rgba(255,255,255,.5)">surveillance automatique</div>
+          </div>
+          <div class="stat">
+            <div class="stat-num">1</div>
+            <div class="stat-label" style="color:rgba(255,255,255,.5)">email hebdo récapitulatif</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div style="margin-top:32px;padding:16px 20px;background:#1D9E75;border-radius:10px;font-size:15px;font-weight:600;max-width:480px">
+      Merci pour votre attention — questions bienvenues 🙌
+    </div>
+  </div>
+
+</div>
+
+<!-- ══ Navigation ════════════════════════════════════════ -->
+<nav class="nav">
+  <button class="nav-btn" id="prev" title="Précédent (←)">&#8592;</button>
+  <div class="nav-dots" id="dots"></div>
+  <button class="nav-btn" id="next" title="Suivant (→)">&#8594;</button>
+  <span class="slide-num" id="num"></span>
+</nav>
+
+<script>
+  const slides = document.querySelectorAll('.slide');
+  const dotsEl  = document.getElementById('dots');
+  const numEl   = document.getElementById('num');
+  let cur = 0;
+
+  // Build dots
+  slides.forEach((_, i) => {
+    const d = document.createElement('button');
+    d.className = 'nav-dot' + (i === 0 ? ' active' : '');
+    d.addEventListener('click', () => go(i));
+    dotsEl.appendChild(d);
+  });
+
+  function go(n) {
+    slides[cur].classList.remove('active');
+    dotsEl.children[cur].classList.remove('active');
+    cur = Math.max(0, Math.min(n, slides.length - 1));
+    slides[cur].classList.add('active');
+    dotsEl.children[cur].classList.add('active');
+    numEl.textContent = `${cur + 1} / ${slides.length}`;
+  }
+
+  document.getElementById('prev').addEventListener('click', () => go(cur - 1));
+  document.getElementById('next').addEventListener('click', () => go(cur + 1));
+
+  document.addEventListener('keydown', e => {
+    if (e.key === 'ArrowRight' || e.key === ' ') go(cur + 1);
+    if (e.key === 'ArrowLeft')  go(cur - 1);
+  });
+
+  go(0);
+</script>
+</body>
+</html>

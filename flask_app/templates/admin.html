@@ -73,6 +73,22 @@
   </details>
 </div>
 
+<!-- Présentation utilisateurs -->
+<div class="sde-card mt-3 d-flex align-items-center justify-content-between" style="padding:14px 18px">
+  <div>
+    <span style="font-size:.85rem;font-weight:700;color:var(--sde-navy)">
+      <i class="bi bi-easel2 me-2"></i>Présentation SDE
+    </span>
+    <div class="sde-ticker-meta mt-1">Slides de présentation pour les futurs utilisateurs</div>
+  </div>
+  <a href="{{ url_for('static', filename='presentation_utilisateurs.html') }}"
+     target="_blank"
+     style="background:#6366F1;color:#fff;border:none;border-radius:7px;
+            padding:6px 16px;font-size:.8rem;font-weight:600;text-decoration:none;white-space:nowrap">
+    <i class="bi bi-box-arrow-up-right me-1"></i>Ouvrir
+  </a>
+</div>
+
 <p class="sde-disclaimer mt-2">
   Un conseil est évalué "bon" si la variation de prix J+1 est dans le sens prévu
   (>0% pour Acheter/Renforcer, &lt;0% pour Alléger/Vendre, |Δ|&lt;3% pour Tenir/Surveiller).
