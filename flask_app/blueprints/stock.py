@@ -187,10 +187,14 @@ def analyze(ticker: str):
     news_list = df_news.head(MAX_NEWS_DISPLAY).to_dict(orient="records")
 
     # ── Insider ───────────────────────────────────────────
-    insider_list = (
-        res["df_insider"].to_dict(orient="records")
-        if not res["df_insider"].empty else []
-    )
+    _INSIDER_COLS = ["date", "nom", "titre", "direction", "titres", "valeur"]
+    if not res["df_insider"].empty:
+        _df_ins = res["df_insider"]
+        _present = [c for c in _INSIDER_COLS if c in _df_ins.columns]
+        _df_ins  = _df_ins[_present].dropna(subset=["direction"])
+        insider_list = _df_ins.head(15).to_dict(orient="records")
+    else:
+        insider_list = []
 
     # ── Scores table ──────────────────────────────────────
     _horizons = {"Technique": "14–50 j", "Fondamental": "trimestriel", "Médiatique": "7–30 j"}

@@ -529,20 +529,52 @@
     <div id="collapseInsider" class="accordion-collapse collapse">
       <div class="accordion-body p-0">
         {% if insider_list %}
+        {% set col_labels = {"date": "Date", "nom": "Insider", "titre": "Fonction",
+                             "direction": "Sens", "titres": "Titres", "valeur": "Valeur (€/$)"} %}
         <div class="table-responsive">
           <table class="table table-sm table-hover mb-0" style="font-size:.78rem">
             <thead class="table-light">
-              <tr>{% for col in insider_list[0].keys() %}<th>{{ col }}</th>{% endfor %}</tr>
+              <tr>
+                {% for col in insider_list[0].keys() %}
+                <th>{{ col_labels.get(col, col) }}</th>
+                {% endfor %}
+              </tr>
             </thead>
             <tbody>
               {% for row in insider_list %}
-              <tr>{% for v in row.values() %}<td>{{ v if v is not none else '—' }}</td>{% endfor %}</tr>
+              <tr>
+                {% for col, v in row.items() %}
+                {% if col == "direction" %}
+                  <td>
+                    {% if v == "BUY" %}
+                      <span style="color:#1D9E75;font-weight:700">▲ Achat</span>
+                    {% elif v == "SELL" %}
+                      <span style="color:#D85A30;font-weight:700">▼ Vente</span>
+                    {% else %}
+                      <span class="text-muted">—</span>
+                    {% endif %}
+                  </td>
+                {% elif col == "valeur" and v %}
+                  <td>{{ "{:,.0f}".format(v|float) if v else "—" }}</td>
+                {% elif col == "date" and v %}
+                  <td>{{ v|string|truncate(10, False, "") }}</td>
+                {% else %}
+                  <td>{{ v if v is not none else '—' }}</td>
+                {% endif %}
+                {% endfor %}
+              </tr>
               {% endfor %}
             </tbody>
           </table>
         </div>
+        {% elif '.' in ticker %}
+        <div class="p-3 text-muted small">
+          <i class="bi bi-info-circle me-1"></i>
+          Les déclarations d'insiders ne sont pas disponibles pour les valeurs non-américaines
+          (source : Yahoo Finance / SEC EDGAR).
+        </div>
         {% else %}
-        <div class="p-3 text-muted small">Aucune transaction insider récente.</div>
+        <div class="p-3 text-muted small">Aucune transaction insider récente (30 derniers jours).</div>
         {% endif %}
       </div>
     </div>
@@ -893,6 +925,11 @@ window.sdePortfolio = (function () {
                           border-radius:10px;padding:1px 7px;margin-left:6px;font-weight:600">
                ✓ Suivi
              </span>`);
+        }
+
+        // N'afficher les objectifs de prix que si position active
+        if (parseFloat(s.total_shares) > 0 && !s.position_fermee) {
+          loadTargets();
         }
       })
       .catch(() => {
@@ -1275,8 +1312,7 @@ window.sdePortfolio = (function () {
 
   /* ── Init ── */
   document.addEventListener("DOMContentLoaded", function () {
-    loadAdvice();   // appelle loadPositions() en fin de chaîne
-    loadTargets();
+    loadAdvice();   // appelle loadPositions() en fin de chaîne, qui appelle loadTargets() si position active
   });
 
   return { openAddModal, submitAdd, deletePos, refreshAdvice, setPosType, saveTargets };

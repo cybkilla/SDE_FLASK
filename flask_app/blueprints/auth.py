@@ -248,6 +248,9 @@ def register():
         if not name:
             errors["name"] = "Le nom affiché est requis."
 
+        if not email:
+            errors["email"] = "L'adresse email est requise."
+
         if not password:
             errors["password"] = "Le mot de passe est requis."
         else:

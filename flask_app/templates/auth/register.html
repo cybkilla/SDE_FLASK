@@ -39,13 +39,14 @@
 
       <!-- Email -->
       <div class="mb-3">
-        <label for="email" class="form-label small fw-semibold">
-          Email <span class="text-muted fw-normal">(optionnel)</span>
-        </label>
+        <label for="email" class="form-label small fw-semibold">Adresse email</label>
         <input type="email" id="email" name="email"
-               class="form-control form-control-sm"
+               class="form-control form-control-sm {% if errors.email %}is-invalid{% endif %}"
                value="{{ prefill.email | default('') }}"
-               placeholder="jean@exemple.com">
+               required placeholder="jean@exemple.com">
+        {% if errors.email %}
+        <div class="invalid-feedback">{{ errors.email }}</div>
+        {% endif %}
       </div>
 
       <!-- Mot de passe -->

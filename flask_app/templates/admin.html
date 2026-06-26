@@ -104,7 +104,7 @@
         </button>
         <button onclick="openDataModal('reset')"
                 class="sde-nav-btn" style="color:#D85A30;font-size:.8rem;white-space:nowrap">
-          <i class="bi bi-arrow-counterclockwise me-1"></i>Réinitialiser données
+          <i class="bi bi-arrow-counterclockwise me-1"></i>Réinitialiser données SDE
         </button>
         <button onclick="openDataModal('delete')"
                 style="background:#991b1b;color:#fff;border:none;border-radius:7px;
@@ -480,7 +480,7 @@
       btn.style.background = "#6366F1";
       btn.textContent = "Envoyer";
     } else if (action === "reset") {
-      title.textContent = "Réinitialiser les données";
+      title.textContent = "Réinitialiser les données SDE";
       desc.innerHTML = `Efface positions, conseils, watchlist, historique et config de <strong>${scope}</strong>.<br>Les comptes sont conservés.`;
       btn.style.background = "#D85A30";
       btn.textContent = "Réinitialiser";

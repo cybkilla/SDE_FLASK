@@ -54,10 +54,10 @@ def update_info():
 
     if not name:
         return jsonify({"ok": False, "error": "Le nom ne peut pas être vide"}), 400
+    if not email:
+        return jsonify({"ok": False, "error": "L'adresse email est requise"}), 400
 
-    fields = {"name": name}
-    if email:
-        fields["email"] = email
+    fields = {"name": name, "email": email}
 
     if _update_field(current_user.id, fields):
         # Mettre à jour le nom sur l'objet courant (sans re-login)

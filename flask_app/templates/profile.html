@@ -64,14 +64,11 @@
              value="{{ current_user.name }}">
     </div>
     <div class="mb-3">
-      <label class="form-label small fw-semibold">
-        Adresse email
-        <span class="text-muted fw-normal">(optionnel)</span>
-      </label>
+      <label class="form-label small fw-semibold">Adresse email</label>
       <input type="email" id="info-email" class="form-control form-control-sm"
-             value="{{ current_user.email or '' }}" placeholder="jean@exemple.com">
+             value="{{ current_user.email or '' }}" required placeholder="jean@exemple.com">
       <div class="form-text" style="font-size:.7rem">
-        L'email est utilisé pour les alertes et le rapport hebdomadaire.
+        Utilisé pour les alertes, le rapport hebdomadaire et la réinitialisation de mot de passe.
       </div>
     </div>
     <div class="d-flex align-items-center gap-2">
