@@ -403,46 +403,108 @@
   </div>
 
   <!-- ══ SLIDE 6 — Portefeuille & alertes ════════════════════════════════════════ -->
-  <div class="slide bg-light">
+  <div class="slide bg-light" style="justify-content:flex-start;padding-top:40px">
     <div class="eyebrow" style="color:#1E3A5F">Fonctionnalités 3 &amp; 4</div>
     <h2>Suivre et protéger votre portefeuille</h2>
     <div class="divider"></div>
-    <div class="two-col">
+
+    <div class="two-col" style="gap:32px;align-items:flex-start">
+
+      <!-- Colonne gauche : points clés -->
       <div>
-        <h3 style="color:#1E3A5F;margin-bottom:16px">Suivi du portefeuille</h3>
+        <h3 style="color:#1E3A5F;margin-bottom:12px">Suivi du portefeuille</h3>
         <ul class="check-list">
-          <li>Ajout de positions (achat, vente ou import d'existant)</li>
+          <li>Ajout de positions : achat, vente ou import de l'existant</li>
           <li>P&amp;L en temps réel par action et au global</li>
-          <li>Coût moyen et historique des lots</li>
+          <li>Coût moyen et historique de chaque lot</li>
           <li>Graphique d'évolution du compte sur 30j / 90j / 1 an</li>
         </ul>
-        <h3 style="color:#1E3A5F;margin-top:28px;margin-bottom:16px">Alertes intelligentes</h3>
+        <h3 style="color:#1E3A5F;margin-top:20px;margin-bottom:12px">Alertes intelligentes</h3>
         <ul class="check-list">
           <li>Email si la recommandation SDE change</li>
-          <li>Email si le cours varie fortement (±5 % par défaut)</li>
+          <li>Email si le cours varie fortement (±5 %)</li>
           <li>Take Profit / Stop Loss personnalisés par position</li>
           <li>Rapport hebdomadaire automatique le dimanche soir</li>
         </ul>
       </div>
+
+      <!-- Colonne droite : aperçu page positions -->
       <div>
-        <div class="card" style="background:#1E3A5F;color:#fff;padding:28px">
-          <p style="font-size:12px;opacity:.4;letter-spacing:.08em;margin-bottom:16px">RAPPORT HEBDO · EXEMPLE</p>
-          <div style="display:flex;justify-content:space-between;margin-bottom:12px">
-            <span style="opacity:.6;font-size:13px">Portefeuille</span>
-            <span style="font-weight:700">$12 450</span>
+        <p style="font-size:11px;font-weight:700;letter-spacing:.08em;color:#94a3b8;margin-bottom:8px">APERÇU · PAGE POSITIONS</p>
+
+        <!-- Bandeau résumé global -->
+        <div style="background:#1E3A5F;border-radius:10px 10px 0 0;padding:10px 14px;
+                    display:flex;gap:24px;color:#fff">
+          <div>
+            <div style="font-size:10px;opacity:.5;text-transform:uppercase;letter-spacing:.05em">Portefeuille</div>
+            <div style="font-size:16px;font-weight:800">$14 820</div>
           </div>
-          <div style="display:flex;justify-content:space-between;margin-bottom:12px">
-            <span style="opacity:.6;font-size:13px">P&amp;L global</span>
-            <span style="font-weight:700;color:#1D9E75">+$1 230</span>
+          <div>
+            <div style="font-size:10px;opacity:.5;text-transform:uppercase;letter-spacing:.05em">P&amp;L total</div>
+            <div style="font-size:16px;font-weight:800;color:#1D9E75">+$2 340 <span style="font-size:12px">(+18.7%)</span></div>
           </div>
-          <div style="display:flex;justify-content:space-between;margin-bottom:20px">
-            <span style="opacity:.6;font-size:13px">Pertinence conseils</span>
-            <span style="font-weight:700;color:#1D9E75">68%</span>
+          <div>
+            <div style="font-size:10px;opacity:.5;text-transform:uppercase;letter-spacing:.05em">Positions</div>
+            <div style="font-size:16px;font-weight:800">3</div>
           </div>
-          <div style="height:1px;background:rgba(255,255,255,.1);margin-bottom:16px"></div>
-          <div style="font-size:12px;opacity:.5">3 tickers · 2 alertes cette semaine</div>
+        </div>
+
+        <!-- Ligne NVIDIA -->
+        <div style="background:#fff;border:1px solid #e5e7eb;border-top:none;padding:12px 14px">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+            <div>
+              <span style="font-weight:800;font-size:14px;color:#1E3A5F">NVDA</span>
+              <span style="font-size:11px;color:#94a3b8;margin-left:6px">NVIDIA Corp.</span>
+              <span style="background:#EEF2FF;color:#6366F1;font-size:10px;font-weight:700;
+                           padding:2px 7px;border-radius:10px;margin-left:6px">↩ Importé</span>
+            </div>
+            <span style="background:#1D9E75;color:#fff;font-size:11px;font-weight:700;
+                         padding:3px 10px;border-radius:6px">↑ Acheter</span>
+          </div>
+          <div style="display:flex;gap:20px;font-size:12px;color:#475569;margin-bottom:8px">
+            <span><strong style="color:#111">$875.40</strong> cours actuel</span>
+            <span style="color:#1D9E75">+2.4% aujourd'hui</span>
+            <span>10 actions · coût moy. <strong>$720.00</strong></span>
+          </div>
+          <!-- Barre TP/SL -->
+          <div style="font-size:10px;color:#94a3b8;margin-bottom:4px;display:flex;justify-content:space-between">
+            <span style="color:#D85A30">SL $650</span>
+            <span style="color:#1D9E75">TP $1 000</span>
+          </div>
+          <div style="background:#f1f5f9;border-radius:4px;height:6px;position:relative">
+            <div style="position:absolute;left:0;top:0;bottom:0;width:36%;background:linear-gradient(90deg,#D85A30,#f1f5f9)
+                        ;border-radius:4px"></div>
+            <div style="position:absolute;left:36%;top:-3px;width:12px;height:12px;
+                        border-radius:50%;background:#1E3A5F;border:2px solid #fff;
+                        box-shadow:0 1px 4px rgba(0,0,0,.2);transform:translateX(-50%)"></div>
+          </div>
+          <div style="text-align:right;font-size:11px;margin-top:4px;font-weight:700;color:#1D9E75">
+            P&amp;L +$1 554 (+21.6%)
+          </div>
+        </div>
+
+        <!-- Ligne APPLE -->
+        <div style="background:#f8fafc;border:1px solid #e5e7eb;border-top:none;
+                    padding:12px 14px;border-radius:0 0 10px 10px">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+            <div>
+              <span style="font-weight:800;font-size:14px;color:#1E3A5F">AAPL</span>
+              <span style="font-size:11px;color:#94a3b8;margin-left:6px">Apple Inc.</span>
+            </div>
+            <span style="background:#BA7517;color:#fff;font-size:11px;font-weight:700;
+                         padding:3px 10px;border-radius:6px">◆ Tenir</span>
+          </div>
+          <div style="display:flex;gap:20px;font-size:12px;color:#475569">
+            <span><strong style="color:#111">$192.30</strong> cours actuel</span>
+            <span style="color:#D85A30">−0.8% aujourd'hui</span>
+            <span>15 actions · coût moy. <strong>$178.50</strong></span>
+          </div>
+          <div style="text-align:right;font-size:11px;margin-top:6px;font-weight:700;color:#1D9E75">
+            P&amp;L +$207 (+7.7%)
+          </div>
         </div>
       </div>
+
     </div>
   </div>
 
