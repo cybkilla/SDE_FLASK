@@ -93,23 +93,79 @@ def _keyword_in_title(keyword: str, title: str) -> bool:
     return bool(re.search(rf"\b{re.escape(keyword)}\b", title, re.I))
 
 
-# ── Transactions insider (yfinance) ───────────────────────
+# ── Codes SEC → direction ─────────────────────────────────
+_BUY_CODES  = {"P", "A", "M"}   # Purchase, Award/Grant, Exercise
+_SELL_CODES = {"S", "D", "F"}   # Sale, Disposition, Forfeiture
+
+
+def _finnhub_direction(code: str, change: float) -> str | None:
+    c = str(code).strip().upper()
+    if c in _BUY_CODES:
+        return "BUY"
+    if c in _SELL_CODES:
+        return "SELL"
+    # Fallback sur le signe du changement net
+    if change > 0:
+        return "BUY"
+    if change < 0:
+        return "SELL"
+    return None
+
+
+# ── Transactions insider (Finnhub primaire, yfinance fallback) ──
 def get_insider_transactions(ticker: str) -> pd.DataFrame:
-    stock = yf.Ticker(ticker)
-    df = stock.insider_transactions
+    import os, requests as req
 
-    if df is None or df.empty:
-        return pd.DataFrame(columns=[
-            "date", "nom", "titre", "direction", "titres", "valeur",
-        ])
+    _EMPTY = pd.DataFrame(columns=["date", "nom", "titre", "direction", "titres", "valeur"])
 
-    df = _normalize_columns(df)
-    df["titres"] = pd.to_numeric(df["titres"], errors="coerce").fillna(0)
-    df["valeur"] = pd.to_numeric(df["valeur"], errors="coerce").fillna(0)
-    df["direction"] = df.apply(_infer_direction, axis=1)
+    # ── Finnhub (primaire — fonctionne sur serveur cloud) ─
+    api_key = os.getenv("FINNHUB_API_KEY", "")
+    if api_key:
+        try:
+            r = req.get(
+                "https://finnhub.io/api/v1/stock/insider-transactions",
+                params={"symbol": ticker, "token": api_key},
+                timeout=8,
+            )
+            r.raise_for_status()
+            txs = r.json().get("data", [])
+            if txs:
+                rows = []
+                for t in txs:
+                    change = float(t.get("change") or 0)
+                    price  = float(t.get("transactionPrice") or 0)
+                    direc  = _finnhub_direction(t.get("transactionCode", ""), change)
+                    if direc is None:
+                        continue
+                    rows.append({
+                        "date":      t.get("transactionDate", ""),
+                        "nom":       t.get("name", ""),
+                        "titre":     "",
+                        "direction": direc,
+                        "titres":    abs(change),
+                        "valeur":    round(abs(change) * price, 2) if price else 0.0,
+                    })
+                if rows:
+                    df = pd.DataFrame(rows).sort_values("date", ascending=False)
+                    return df.head(15).reset_index(drop=True)
+        except Exception as e:
+            print(f"[Insider/Finnhub] {e}", flush=True)
 
-    cols = ["date", "nom", "titre", "direction", "titres", "valeur"]
-    return df[cols].head(15)
+    # ── Fallback yfinance (marché local / dev) ─────────────
+    try:
+        stock = yf.Ticker(ticker)
+        df = stock.insider_transactions
+        if df is None or df.empty:
+            return _EMPTY
+        df = _normalize_columns(df)
+        df["titres"] = pd.to_numeric(df["titres"], errors="coerce").fillna(0)
+        df["valeur"] = pd.to_numeric(df["valeur"], errors="coerce").fillna(0)
+        df["direction"] = df.apply(_infer_direction, axis=1)
+        cols = ["date", "nom", "titre", "direction", "titres", "valeur"]
+        return df[cols].head(15)
+    except Exception as e:
+        print(f"[Insider/yfinance] {e}", flush=True)
+        return _EMPTY
 
 
 # ── Score insider ─────────────────────────────────────────
