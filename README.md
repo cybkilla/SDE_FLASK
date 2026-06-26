@@ -10,7 +10,7 @@ Application web d'aide à la décision boursière. Analyse n'importe quelle acti
 - **Signaux techniques** : RSI, MACD, moyennes mobiles (MA20/MA50), volume ratio
 - **Données fondamentales** : P/E, EPS, dette/capitalisation, croissance CA
 - **Analyse médiatique** : sentiment NLP (VADER) sur presse et flux RSS
-- **Activité insiders** : transactions des dirigeants
+- **Activité insiders** : transactions des dirigeants (disponible pour les valeurs US uniquement — source SEC/Yahoo Finance)
 - **Risque dirigeants** : détection d'événements (scandales, départs, rachats)
 - **Zones de trading** : entrée, objectif cible, stop-loss, ratio R/R
 - **Synthèse IA** : résumé généré par LLaMA 3.3 70B via Groq (fallback Python)
@@ -35,13 +35,16 @@ Application web d'aide à la décision boursière. Analyse n'importe quelle acti
 - **Breakdown par type** : taux par action (ACHETER, RENFORCER, TENIR, SURVEILLER, ALLÉGER, VENDRE)
 - **Breakdown par ticker** : taux de fiabilité et dernier conseil pour chaque valeur suivie
 - Note automatique si consulté avant 22h00 (évaluations J+1 incomplètes avant clôture)
+- **Gestion des données** : réinitialisation (positions, conseils, watchlist, historique) ou suppression de compte par utilisateur ou pour tous — protégé par `ADMIN_DATA_PASSWORD`
+- **Reset mot de passe** : envoi d'un lien de réinitialisation par email pour n'importe quel utilisateur
 
 ### Plateforme
 - **Statut marché NASDAQ** : badge "Marché ouvert" (15h30–22h00 heure de Paris) / "Clôture J-1" sur tous les affichages de prix
 - **Watchlist** personnelle (AJAX, sans rechargement de page)
 - **Cache 3 niveaux** : mémoire 15 min → snapshot Supabase 24h → pipeline complet
 - **Prix live** : superposition du prix Finnhub en temps réel sur les analyses en cache
-- **Authentification** : inscription / connexion / sessions persistantes (Flask-Login + bcrypt)
+- **Authentification renforcée** : inscription / connexion / déconnexion, sessions persistantes (Flask-Login + bcrypt), politique de mot de passe (8+ chars, majuscule, chiffre, spécial), activation de compte par email, mot de passe oublié (lien email one-use 1h), rate limiting (5 tentatives / 15 min / IP)
+- **Profil utilisateur** : modification du nom, email (obligatoire), photo de profil (redimensionnée 128×128 JPEG côté client, stockée en base64)
 - **Alertes email** : notification sur variation de cours ou changement de recommandation (Resend HTTP)
 - **Scheduler deux vitesses** : prix live toutes les 30 min (Finnhub léger) + pipeline complet 1×/jour
 - **Interface responsive** : navbar intégrée, mobile-first, Bootstrap 5
@@ -114,6 +117,7 @@ CRON_SECRET=un_token_aleatoire_long
 
 # Admin dashboard
 ADMIN_EMAILS=votre_email@domaine.com
+ADMIN_DATA_PASSWORD=choisir_un_mot_de_passe_fort_ici
 ```
 
 Sources des clés :
@@ -173,10 +177,11 @@ sde_flask/
 ├── flask_app/
 │   ├── __init__.py           # Factory create_app()
 │   ├── blueprints/
-│   │   ├── auth.py           # Routes /auth/login, /register, /logout
+│   │   ├── auth.py           # Routes /auth/login, /register, /logout, /activate, /forgot-password, /reset-password
 │   │   ├── stock.py          # Routes /, /analyze/<ticker>, /api/search, /watchlist
 │   │   ├── portfolio.py      # Routes /portfolio/positions, /portfolio/advice, /portfolio/overview
-│   │   ├── admin.py          # Route /admin/dashboard, /admin/stats (ADMIN_EMAILS requis)
+│   │   ├── profile.py        # Routes /profile/ (infos, mot de passe, avatar)
+│   │   ├── admin.py          # Route /admin/dashboard, /admin/stats, /admin/data/* (ADMIN_EMAILS requis)
 │   │   └── cron.py           # Route /scheduler/run (protégée par CRON_SECRET)
 │   ├── static/
 │   │   ├── css/sde.css       # Design system (Dashboard Financier)
@@ -189,7 +194,8 @@ sde_flask/
 │       ├── analysis.html     # Page d'analyse + section Ma position + modal transaction
 │       ├── portfolio.html    # Vue d'ensemble positions + P&L + conseils du jour
 │       ├── admin.html        # Dashboard admin : taux pertinence conseils
-│       └── auth/
+│       ├── profile.html      # Page profil : nom, email, photo, mot de passe
+│       └── auth/             # login.html, register.html, forgot_password.html, reset_password.html
 ├── analysis/
 │   ├── scoring.py            # Score global pondéré (technique + fondamental + médiatique)
 │   ├── candle_patterns.py    # Détection de 12 figures chartistes
@@ -197,10 +203,13 @@ sde_flask/
 │   ├── media_score.py        # Score médiatique agrégé
 │   ├── executive_risk.py     # Risque dirigeants
 │   └── llm_explain.py        # Appels Groq / fallback Python
+├── auth/
+│   ├── password_policy.py    # Politique mot de passe (8+ chars, majuscule, chiffre, spécial)
+│   └── auth_tokens.py        # Génération / validation / consommation tokens activation & reset (table auth_tokens)
 ├── data/
 │   ├── market.py             # get_market_data() + get_live_price() (Finnhub → yfinance fallback)
 │   ├── news.py               # NewsAPI + feedparser RSS
-│   └── insider.py            # Transactions insiders
+│   └── insider.py            # Transactions insiders (US uniquement — SEC via Yahoo Finance)
 ├── portfolio/
 │   ├── positions.py          # get_portfolio_summary(), add_position(), delete_position()
 │   │                         # P&L séparé : pnl_realise + pnl_non_realise + position_fermee
@@ -223,7 +232,8 @@ Voir `doc/SUPABASE.md` pour le schéma SQL complet et les politiques RLS.
 
 | Table | Rôle |
 |---|---|
-| `users` | Comptes utilisateurs |
+| `users` | Comptes utilisateurs — colonnes `name`, `email`, `password` (bcrypt), `avatar` (base64), `email_verified` |
+| `auth_tokens` | Tokens one-use d'activation de compte et de reset de mot de passe (expiry, type) |
 | `watchlist` | Tickers suivis par utilisateur |
 | `scores` | Dernier score/reco connu par ticker |
 | `ticker_snapshots` | Résultats pipeline sérialisés (cache 24h) |
@@ -250,6 +260,10 @@ La détection s'effectue côté client via `window.sdeMarketStatus()` (JavaScrip
 - Protection CSRF sur tous les formulaires et requêtes AJAX (Flask-WTF + header `X-CSRFToken`)
 - Sessions HTTP-only, SameSite=Lax
 - `ADMIN_EMAILS` : accès dashboard admin vérifié via `current_user.email` (pas `current_user.id`)
+- Politique mot de passe : 8+ caractères, 1 majuscule, 1 chiffre, 1 spécial — vérifiée à l'inscription, au profil et au reset
+- Rate limiting login : 5 tentatives / 15 min / IP (in-memory, compatible `workers=1` Gunicorn)
+- Tokens auth one-use (`auth_tokens`) avec expiry (24h activation, 1h reset) — `hmac.compare_digest` pour comparaisons sécurisées
+- `ADMIN_DATA_PASSWORD` : protège les opérations de reset/suppression de données en admin
 
 ## Avertissement
 
