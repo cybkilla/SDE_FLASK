@@ -1352,19 +1352,25 @@ document.addEventListener("DOMContentLoaded", function () {
   if (tabBtn) tabBtn.addEventListener("shown.bs.tab", renderCandle);
   {% endif %}
 
-  // Badge statut marché
-  (function () {
-    const ms  = window.sdeMarketStatus && window.sdeMarketStatus();
-    const el  = document.getElementById("sde-mkt-badge");
+  // Badge statut marché — mis à jour chaque minute
+  function _updateMarketBadge() {
+    const ms = window.sdeMarketStatus && window.sdeMarketStatus();
+    const el = document.getElementById("sde-mkt-badge");
     if (!ms || !el) return;
     if (ms.isOpen) {
       el.innerHTML = `<span style="background:#E1F5EE;color:#1D9E75;font-size:.66rem;
         font-weight:700;padding:2px 7px;border-radius:10px;vertical-align:middle">● Marché ouvert</span>`;
+    } else if (ms.afterClose && ms.h < 24) {
+      // 22h00–00h00 Paris : after-hours US possible
+      el.innerHTML = `<span style="background:#FEF3C7;color:#92400E;font-size:.66rem;
+        font-weight:600;padding:2px 7px;border-radius:10px;vertical-align:middle">● After-hours</span>`;
     } else {
       el.innerHTML = `<span style="background:#F1F5F9;color:var(--sde-muted);font-size:.66rem;
         font-weight:600;padding:2px 7px;border-radius:10px;vertical-align:middle">● Clôture J-1</span>`;
     }
-  })();
+  }
+  _updateMarketBadge();
+  setInterval(_updateMarketBadge, 60000);
 });
 </script>
 {% endblock %}
