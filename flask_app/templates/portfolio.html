@@ -451,7 +451,9 @@
     fetch(`/portfolio/advice/${ticker}/reset`, {
       method: "POST",
       headers: { "X-CSRFToken": CSRF }
-    }).then(() => loadOverview());
+    })
+    .then(() => fetch(`/portfolio/advice/${ticker}`))  // régénère le conseil
+    .then(() => loadOverview());
   }
 
   /* ── Chargement overview ── */
