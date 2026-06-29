@@ -34,13 +34,19 @@ def _get_data_date(snapshot: dict) -> str:
     return ""
 
 
-def _dominant_signals_note(snapshot: dict, data_date: str = "", threshold: int = 10) -> str:
+def _dominant_signals_note(snapshot: dict, data_date: str = "",
+                           direction: str = "", threshold: int = 10) -> str:
     """
     Retourne des lignes HTML pour les signaux à fort impact (|points| >= threshold).
+    direction : "baissier" → filtre les signaux négatifs (conseil VENDRE/ALLÉGER)
+                "haussier" → filtre les signaux positifs (conseil ACHETER/RENFORCER)
+                ""         → tous les signaux (TENIR/SURVEILLER)
     Chaque signal est sur sa propre ligne, préfixé de sa date.
     """
     sigs = snapshot.get("signals_tech", []) + snapshot.get("signals_fund", [])
     dominant = [s for s in sigs if abs(s.get("points", 0)) >= threshold]
+    if direction:
+        dominant = [s for s in dominant if s.get("sens") == direction]
     if not dominant:
         return ""
     dominant.sort(key=lambda s: abs(s.get("points", 0)), reverse=True)
@@ -77,14 +83,22 @@ def generate_advice(summary: dict | None, market: dict, snapshot: dict,
     # Dates pour préfixer chaque ligne du raisonnement
     conseil_date_str = date.today().strftime("%d.%m.%Y")
     data_date_str    = _get_data_date(snapshot)
-    signals_note     = _dominant_signals_note(snapshot, data_date_str)
     cd = f"{conseil_date_str} : "
 
     def _finalize(conseil, pnl=None, shares=0, px=0):
         r = _with_candle(conseil, candle_info, pnl, score, reco, shares, px,
                          data_date=data_date_str)
-        if signals_note:
-            r["raisonnement"] += signals_note
+        # Filtrer les signaux dans le sens du conseil final
+        action = r["action"]
+        if action in ("VENDRE", "ALLÉGER"):
+            direction = "baissier"
+        elif action in ("ACHETER", "RENFORCER"):
+            direction = "haussier"
+        else:
+            direction = ""  # TENIR/SURVEILLER : pas de signaux dominants à afficher
+        note = _dominant_signals_note(snapshot, data_date_str, direction)
+        if note:
+            r["raisonnement"] += note
         return r
 
     # ── Cas 1 : pas de position ───────────────────────────────────────────────
