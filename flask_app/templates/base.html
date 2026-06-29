@@ -19,28 +19,30 @@
   <!-- Logo -->
   <a href="{{ url_for('stock.home') }}" class="sde-brand">SDE</a>
 
-  <!-- Search (toujours visible, grow sur mobile) -->
-  <div class="sde-search-wrap">
-    <i class="bi bi-search sde-search-icon"></i>
-    <input id="sde-search-input" type="text"
-           placeholder="Rechercher Apple, TSLA, NVDA…"
-           autocomplete="off">
-    <ul id="sde-search-dropdown" class="sde-search-dropdown d-none"></ul>
-  </div>
+  <!-- Ligne recherche : search + badge + analyser (passe en 1re ligne sur mobile) -->
+  <div class="sde-search-row">
+    <div class="sde-search-wrap">
+      <i class="bi bi-search sde-search-icon"></i>
+      <input id="sde-search-input" type="text"
+             placeholder="Rechercher Apple, TSLA, NVDA…"
+             autocomplete="off">
+      <ul id="sde-search-dropdown" class="sde-search-dropdown d-none"></ul>
+    </div>
 
-  <!-- Ticker sélectionné (affiché par JS) -->
-  <div id="sde-ticker-badge" class="d-none">
-    <span class="sde-ticker-pill">
-      <span id="sde-ticker-label"></span>
-      <button id="sde-ticker-clear" style="background:none;border:none;padding:0;line-height:1;color:#1D4ED8;cursor:pointer">✕</button>
-    </span>
-  </div>
+    <!-- Ticker sélectionné (affiché par JS) -->
+    <div id="sde-ticker-badge" class="d-none">
+      <span class="sde-ticker-pill">
+        <span id="sde-ticker-label"></span>
+        <button id="sde-ticker-clear" style="background:none;border:none;padding:0;line-height:1;color:#1D4ED8;cursor:pointer">✕</button>
+      </span>
+    </div>
 
-  <!-- Bouton Analyser -->
-  <button id="sde-analyze-btn" class="sde-nav-btn primary" disabled>
-    <i class="bi bi-graph-up-arrow"></i>
-    <span class="hide-xs label">Analyser</span>
-  </button>
+    <!-- Bouton Analyser -->
+    <button id="sde-analyze-btn" class="sde-nav-btn primary" disabled>
+      <i class="bi bi-graph-up-arrow"></i>
+      <span class="label">Analyser</span>
+    </button>
+  </div>
 
   <!-- Right : watchlist + auth -->
   <div class="sde-nav-right">

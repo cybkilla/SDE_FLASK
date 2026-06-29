@@ -53,6 +53,15 @@ a:hover { text-decoration: underline; }
 }
 .sde-brand:hover { color: var(--sde-teal); text-decoration: none; }
 
+/* Groupe search + badge + analyser (devient 1re ligne sur mobile) */
+.sde-search-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+}
+
 /* Search wrapper in navbar */
 .sde-search-wrap {
   flex: 1;
@@ -455,4 +464,22 @@ a:hover { text-decoration: underline; }
 }
 @media (max-width: 479px) {
   .hide-xs { display: none !important; }
+
+  /* Navbar 2 lignes sur mobile */
+  .sde-navbar {
+    flex-wrap: wrap;
+    height: auto;
+    padding: 6px 12px 6px;
+    gap: 4px;
+    row-gap: 6px;
+  }
+  /* Ligne 1 : recherche pleine largeur */
+  .sde-search-row {
+    order: -1;
+    flex: 0 0 100%;
+    width: 100%;
+  }
+  /* Ligne 2 : logo + menus */
+  .sde-brand { order: 0; }
+  .sde-nav-right { order: 1; }
 }
